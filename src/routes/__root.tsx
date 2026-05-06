@@ -113,6 +113,7 @@ import { BetSlipProvider } from "@/contexts/BetSlipContext";
 import { Toaster } from "@/components/ui/sonner";
 
 import { MaintenanceGate } from "@/components/MaintenanceGate";
+import { BanGate } from "@/components/BanGate";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -123,6 +124,7 @@ function RootComponent() {
           <MaintenanceGate>
             <Outlet />
           </MaintenanceGate>
+          <BanGate />
           <Toaster />
         </BetSlipProvider>
       </AuthProvider>

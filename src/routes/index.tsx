@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MatchCardLive } from "@/components/MatchCardLive";
+import { EventBanner } from "@/components/EventBanner";
 import { Crosshair, Flame, Trophy, Megaphone, ChevronRight, Skull, Target, Zap, Coins, X } from "lucide-react";
 import hero from "@/assets/hero.jpg";
 import { fetchMatches, fetchAnnouncements, type MatchRow } from "@/lib/queries";
@@ -73,6 +74,8 @@ function Index() {
           </div>
         </div>
       </section>
+
+      <EventBanner />
 
       {ann[0] && (
         <section className="container -mt-4 mb-10">
