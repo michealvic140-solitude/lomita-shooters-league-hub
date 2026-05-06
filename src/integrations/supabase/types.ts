@@ -137,6 +137,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ban_appeals: {
+        Row: {
+          admin_response: string | null
+          created_at: string
+          id: string
+          message: string
+          reviewed_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          admin_response?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          reviewed_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          admin_response?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          reviewed_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bet_selections: {
         Row: {
           bet_id: string
@@ -205,6 +235,7 @@ export type Database = {
       bets: {
         Row: {
           booking_code: string
+          cashed_out_at: string | null
           cashout_amount: number | null
           created_at: string
           id: string
@@ -218,6 +249,7 @@ export type Database = {
         }
         Insert: {
           booking_code?: string
+          cashed_out_at?: string | null
           cashout_amount?: number | null
           created_at?: string
           id?: string
@@ -231,6 +263,7 @@ export type Database = {
         }
         Update: {
           booking_code?: string
+          cashed_out_at?: string | null
           cashout_amount?: number | null
           created_at?: string
           id?: string
@@ -289,6 +322,42 @@ export type Database = {
           image_url?: string | null
           room?: Database["public"]["Enums"]["chat_room"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          banner_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          ends_at: string
+          id: string
+          is_active: boolean
+          starts_at: string | null
+          title: string
+        }
+        Insert: {
+          banner_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at: string
+          id?: string
+          is_active?: boolean
+          starts_at?: string | null
+          title: string
+        }
+        Update: {
+          banner_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string
+          id?: string
+          is_active?: boolean
+          starts_at?: string | null
+          title?: string
         }
         Relationships: []
       }
