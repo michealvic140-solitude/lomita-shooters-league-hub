@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MatchCardLive } from "@/components/MatchCardLive";
 import { EventBanner } from "@/components/EventBanner";
+import { AnnouncementSlider, HighlightsRow, AdsRow } from "@/components/HomeContent";
 import { Crosshair, Flame, Trophy, Megaphone, ChevronRight, Skull, Target, Zap, Coins, X } from "lucide-react";
 import hero from "@/assets/hero.jpg";
 import { fetchMatches, fetchAnnouncements, type MatchRow } from "@/lib/queries";
@@ -92,6 +93,8 @@ function Index() {
         </section>
       )}
 
+      <AnnouncementSlider />
+
       <section className="container grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-10">
           {loading && <p className="text-muted-foreground">Loading league…</p>}
@@ -136,6 +139,9 @@ function Index() {
           </Card>
         </aside>
       </section>
+
+      <HighlightsRow />
+      <AdsRow />
     </Layout>
   );
 }
@@ -159,6 +165,7 @@ function BetSlipPanel() {
   const placeBet = async () => {
     if (!user) { nav({ to: "/login" }); return; }
     if (!profile) return;
+    if (profile.is_restricted) { toast.error(`Betting restricted: ${profile.restrict_reason || "Contact support"}`); return; }
     if (stake < 10) { toast.error("Minimum stake is 10 tokens"); return; }
     if (stake > profile.token_balance) { toast.error("Insufficient tokens"); return; }
     if (selections.length === 0) return;
