@@ -1,39 +1,48 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Layout } from "@/components/Layout";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Crosshair } from "lucide-react";
+import { toast } from "sonner";
+import { Layout } from "@/components/Layout";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — LSL" }, { name: "description", content: "Sign in to the Lomita Shooters League." }] }),
+  head: () => ({ meta: [{ title: "Sign in — Lomita Shooters League" }] }),
   component: LoginPage,
 });
 
 function LoginPage() {
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    toast.success("Welcome back!");
+    nav({ to: "/dashboard" });
+  };
+
   return (
     <Layout>
-      <div className="container py-16 max-w-md">
-        <Card className="glass-strong p-8">
-          <div className="text-center mb-6">
-            <Crosshair className="h-10 w-10 text-gold mx-auto" style={{ animation: "var(--animate-pulse-glow)" }} />
-            <h1 className="text-2xl font-bold mt-3 gradient-gold-text">Welcome back, shooter</h1>
-            <p className="text-xs text-muted-foreground mt-1">Sign in to claim your tokens.</p>
-          </div>
-          <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@lsl.dev" />
-            </div>
-            <div>
-              <Label htmlFor="pw">Password</Label>
-              <Input id="pw" type="password" placeholder="••••••••" />
-            </div>
-            <Button className="w-full btn-luxury">Sign in</Button>
+      <div className="container mx-auto px-4 py-16 max-w-md">
+        <Card className="p-8 backdrop-blur-xl bg-card/60 border-primary/30">
+          <h1 className="text-3xl font-bold text-primary mb-1">Sign In</h1>
+          <p className="text-sm text-muted-foreground mb-6">Enter the arena</p>
+          <form onSubmit={submit} className="space-y-4">
+            <div><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <div><Label>Password</Label><Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            <Button type="submit" disabled={loading} className="w-full">{loading ? "Signing in..." : "Sign In"}</Button>
           </form>
-          <div className="text-center text-xs text-muted-foreground mt-4">
-            New here? <Link to="/register" className="text-gold hover:underline">Join the League</Link>
+          <div className="mt-4 flex justify-between text-sm">
+            <Link to="/register" className="text-primary hover:underline">Create account</Link>
+            <Link to="/forgot-password" className="text-muted-foreground hover:underline">Forgot password?</Link>
           </div>
         </Card>
       </div>
