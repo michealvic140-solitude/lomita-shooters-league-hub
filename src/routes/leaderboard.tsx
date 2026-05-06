@@ -1,85 +1,90 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { shooters, gangs } from "@/lib/mock-data";
-import { Crown, Trophy, Skull } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trophy, Coins, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/leaderboard")({
-  head: () => ({
-    meta: [
-      { title: "Leaderboard — Lomita Shooters League" },
-      { name: "description", content: "Top shooters and gangs ranked across Season 4 of the Lomita Shooters League." },
-      { property: "og:title", content: "LSL · Leaderboard" },
-      { property: "og:description", content: "See who's claiming the gold this season." },
-    ],
-  }),
-  component: LeaderboardPage,
+  head: () => ({ meta: [{ title: "Leaderboard — LSL" }, { name: "description", content: "Top shooters and gangs in the Lomita Shooters League." }] }),
+  component: Page,
 });
 
-function LeaderboardPage() {
+function Page() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [gangs, setGangs] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from("profiles")
+      .select("id,full_name,gang_name,gang_type,token_balance,avatar_url")
+      .order("token_balance", { ascending: false })
+      .limit(50)
+      .then(({ data }) => setUsers(data ?? []));
+    supabase.from("profiles")
+      .select("gang_name,gang_type,token_balance")
+      .not("gang_name", "is", null)
+      .then(({ data }) => {
+        const map = new Map<string, { name: string; type: string | null; total: number; members: number }>();
+        (data ?? []).forEach((p: any) => {
+          if (!p.gang_name) return;
+          const k = p.gang_name;
+          const cur = map.get(k) ?? { name: k, type: p.gang_type, total: 0, members: 0 };
+          cur.total += p.token_balance ?? 0; cur.members += 1;
+          map.set(k, cur);
+        });
+        setGangs(Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30));
+      });
+  }, []);
+
   return (
     <Layout>
       <div className="container py-10">
-        <h1 className="text-4xl font-bold gradient-gold-text">Leaderboard</h1>
-        <p className="text-muted-foreground mt-2">Season 4 standings · updated every round.</p>
-
-        <div className="grid md:grid-cols-2 gap-6 mt-8">
-          <Card className="glass p-6">
-            <h2 className="font-bold mb-4 flex items-center gap-2"><Crown className="h-5 w-5 text-gold" />Top Gangs</h2>
-            <div className="space-y-2">
-              {gangs.map((g, i) => (
-                <div key={g.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary/30 transition">
-                  <div className="w-8 text-center font-bold gradient-gold-text">{i + 1}</div>
-                  <div className="h-9 w-9 rounded-md" style={{ background: g.color }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold truncate">{g.name}</div>
-                    <div className="text-[10px] text-muted-foreground">{g.members} members · {g.wins} wins</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gold">{g.points.toLocaleString()}</div>
-                    <div className="text-[10px] text-muted-foreground">pts</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="glass p-6">
-            <h2 className="font-bold mb-4 flex items-center gap-2"><Trophy className="h-5 w-5 text-gold" />Top Shooters</h2>
-            <div className="space-y-2">
-              {shooters.map((s, i) => (
-                <div key={s.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary/30 transition">
-                  <div className="w-8 text-center font-bold gradient-gold-text">{i + 1}</div>
-                  <div className="h-9 w-9 rounded-full bg-gradient-emerald grid place-items-center text-[var(--primary-foreground)] font-bold text-xs">
-                    {s.alias.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold truncate flex items-center gap-2">{s.alias} <Badge variant="outline" className="text-[9px] border-[var(--gold)]/30 text-gold">{s.role}</Badge></div>
-                    <div className="text-[10px] text-muted-foreground truncate">{s.name} · {s.gang}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gold">{s.points.toLocaleString()}</div>
-                    <div className="text-[10px] text-muted-foreground">K/D {s.kdr}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+        <div className="flex items-center gap-2 mb-6">
+          <Trophy className="h-7 w-7 text-primary" />
+          <h1 className="text-3xl font-bold gradient-gold-text">Leaderboard</h1>
         </div>
-
-        <Card className="glass p-6 mt-6">
-          <h2 className="font-bold mb-3 flex items-center gap-2"><Skull className="h-5 w-5 text-gold" />Hall of Fame</h2>
-          <p className="text-sm text-muted-foreground">Past season champions, immortalized in gold.</p>
-          <div className="mt-4 grid sm:grid-cols-3 gap-3">
-            {["Season 3 · Iron Phantoms", "Season 2 · Crimson Vipers", "Season 1 · Golden Wolves"].map((t) => (
-              <div key={t} className="px-3 py-4 rounded-md text-center border border-[var(--gold)]/30 bg-gradient-luxury">
-                <Trophy className="h-6 w-6 text-gold mx-auto" />
-                <div className="mt-2 text-sm font-bold">{t}</div>
-              </div>
+        <Tabs defaultValue="shooters">
+          <TabsList>
+            <TabsTrigger value="shooters">Top Shooters</TabsTrigger>
+            <TabsTrigger value="gangs">Top Gangs</TabsTrigger>
+          </TabsList>
+          <TabsContent value="shooters" className="mt-4 space-y-2">
+            {users.length === 0 && <p className="text-muted-foreground text-sm">No shooters yet.</p>}
+            {users.map((u, i) => (
+              <Card key={u.id} className="glass p-3 flex items-center gap-3">
+                <div className="text-2xl font-bold gradient-gold-text w-10 text-center">{i + 1}</div>
+                <div className="h-10 w-10 rounded-full bg-gradient-gold grid place-items-center text-primary-foreground font-bold text-xs">
+                  {(u.full_name ?? "?").slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold truncate">{u.full_name}</div>
+                  <div className="text-xs text-muted-foreground truncate">{u.gang_name ?? "Independent"}{u.gang_type && ` · ${u.gang_type}`}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-primary flex items-center gap-1"><Coins className="h-3 w-3" />{u.token_balance.toLocaleString()}</div>
+                </div>
+              </Card>
             ))}
-          </div>
-        </Card>
+          </TabsContent>
+          <TabsContent value="gangs" className="mt-4 space-y-2">
+            {gangs.length === 0 && <p className="text-muted-foreground text-sm">No gangs yet.</p>}
+            {gangs.map((g, i) => (
+              <Card key={g.name} className="glass p-3 flex items-center gap-3">
+                <div className="text-2xl font-bold gradient-gold-text w-10 text-center">{i + 1}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold truncate">{g.name}</div>
+                  <div className="text-xs text-muted-foreground">{g.members} members{g.type && ` · ${g.type}`}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-accent flex items-center gap-1"><TrendingUp className="h-3 w-3" />{g.total.toLocaleString()}</div>
+                  <Badge variant="outline" className="text-[10px]">total tokens</Badge>
+                </div>
+              </Card>
+            ))}
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
