@@ -91,6 +91,8 @@ function Page() {
           </form>
         </Card>
 
+        <PromoRedeem />
+
         <h2 className="font-bold mt-8 mb-3">My requests</h2>
         <div className="space-y-2">
           {requests.length === 0 && <p className="text-muted-foreground text-sm">No requests yet.</p>}
