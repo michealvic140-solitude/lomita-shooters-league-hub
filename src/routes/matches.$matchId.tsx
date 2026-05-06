@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { matches } from "@/lib/mock-data";
+import { matches, type Match } from "@/lib/mock-data";
 import { Countdown } from "@/components/Countdown";
 import { ArrowLeft, MapPin, Crosshair } from "lucide-react";
 
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/matches/$matchId")({
 });
 
 function MatchDetail() {
-  const { match } = Route.useLoaderData();
+  const { match } = Route.useLoaderData() as { match: Match };
   return (
     <Layout>
       <div className="container py-8">
