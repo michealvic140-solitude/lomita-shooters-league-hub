@@ -75,6 +75,8 @@ function Index() {
         </div>
       </section>
 
+      <EventBanner />
+
       {ann[0] && (
         <section className="container -mt-4 mb-10">
           <Card className="glass-strong p-4 flex items-center gap-3 border-accent/30">
