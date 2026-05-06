@@ -19,7 +19,9 @@ export interface Profile {
   is_banned: boolean;
   ban_reason: string | null;
   is_muted: boolean;
+  mute_reason: string | null;
   is_restricted: boolean;
+  restrict_reason: string | null;
   accepted_terms: boolean;
 }
 
