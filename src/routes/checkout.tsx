@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Coins, Upload, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Coins, Upload, Clock, CheckCircle, XCircle, Tag } from "lucide-react";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({ meta: [{ title: "Buy Tokens — LSL" }, { name: "description", content: "Request tokens to wager in the Lomita Shooters League." }] }),
@@ -116,6 +116,45 @@ function Page() {
 
 function StatusIcon({ s }: { s: string }) {
   if (s === "approved") return <CheckCircle className="h-5 w-5 text-accent" />;
-  if (s === "rejected") return <XCircle className="h-5 w-5 text-destructive" />;
+  if (s === "rejected" || s === "denied") return <XCircle className="h-5 w-5 text-destructive" />;
   return <Clock className="h-5 w-5 text-muted-foreground" />;
+}
+
+function PromoRedeem() {
+  const { user, profile, refresh } = useAuth();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function redeem() {
+    if (!user || !profile || !code.trim()) return;
+    setBusy(true);
+    try {
+      const c = code.trim().toUpperCase();
+      const { data: promo, error } = await supabase.from("promo_codes").select("*").eq("code", c).maybeSingle();
+      if (error) throw error;
+      if (!promo || !promo.is_active) throw new Error("Invalid code");
+      if (promo.expires_at && new Date(promo.expires_at) < new Date()) throw new Error("Code expired");
+
+      const { count } = await supabase.from("promo_redemptions").select("*", { count: "exact", head: true }).eq("promo_id", promo.id).eq("user_id", user.id);
+      if ((count ?? 0) >= (promo.usage_limit ?? 1)) throw new Error("You have already used this code the maximum number of times");
+
+      await supabase.from("promo_redemptions").insert({ promo_id: promo.id, user_id: user.id, amount: promo.amount });
+      await supabase.from("profiles").update({ token_balance: (profile.token_balance ?? 0) + promo.amount }).eq("id", user.id);
+      await supabase.from("promo_codes").update({ used_count: (promo.used_count ?? 0) + 1 }).eq("id", promo.id);
+      await supabase.from("notifications").insert({ user_id: user.id, title: "Promo redeemed", body: `+${promo.amount} tokens from code ${c}` });
+      toast.success(`+${promo.amount} tokens credited!`);
+      setCode(""); refresh();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Card className="glass-strong p-5 mt-4 space-y-2">
+      <div className="font-bold flex items-center gap-2"><Tag className="h-4 w-4 text-accent" />Redeem promo code</div>
+      <div className="flex gap-2">
+        <Input placeholder="ENTER CODE" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="font-mono" />
+        <Button className="btn-luxury" disabled={busy || !code.trim()} onClick={redeem}>{busy ? "…" : "Redeem"}</Button>
+      </div>
+    </Card>
+  );
 }
