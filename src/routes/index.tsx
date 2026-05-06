@@ -165,6 +165,7 @@ function BetSlipPanel() {
   const placeBet = async () => {
     if (!user) { nav({ to: "/login" }); return; }
     if (!profile) return;
+    if (profile.is_restricted) { toast.error(`Betting restricted: ${profile.restrict_reason || "Contact support"}`); return; }
     if (stake < 10) { toast.error("Minimum stake is 10 tokens"); return; }
     if (stake > profile.token_balance) { toast.error("Insufficient tokens"); return; }
     if (selections.length === 0) return;
