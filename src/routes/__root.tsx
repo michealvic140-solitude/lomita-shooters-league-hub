@@ -108,12 +108,20 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { AuthProvider } from "@/contexts/AuthContext";
+import { BetSlipProvider } from "@/contexts/BetSlipContext";
+import { Toaster } from "@/components/ui/sonner";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <BetSlipProvider>
+          <Outlet />
+          <Toaster />
+        </BetSlipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

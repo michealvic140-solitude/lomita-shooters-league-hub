@@ -1,56 +1,73 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Layout } from "@/components/Layout";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Crosshair } from "lucide-react";
-import { gangs } from "@/lib/mock-data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
+import { Layout } from "@/components/Layout";
 
 export const Route = createFileRoute("/register")({
-  head: () => ({ meta: [{ title: "Join the League — LSL" }, { name: "description", content: "Create your Lomita Shooters League account." }] }),
+  head: () => ({ meta: [{ title: "Join the League — Lomita Shooters League" }] }),
   component: RegisterPage,
 });
 
 function RegisterPage() {
+  const nav = useNavigate();
+  const [f, setF] = useState({ full_name: "", email: "", password: "", phone: "", discord_username: "", country: "", gang_name: "", gang_type: "" });
+  const [accepted, setAccepted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accepted) return toast.error("You must accept the terms");
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email: f.email, password: f.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: { full_name: f.full_name, phone: f.phone, discord_username: f.discord_username,
+          country: f.country, gang_name: f.gang_name, gang_type: f.gang_type },
+      },
+    });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    toast.success("Account created! Check your email to verify.");
+    nav({ to: "/login" });
+  };
+
   return (
     <Layout>
-      <div className="container py-16 max-w-md">
-        <Card className="glass-strong p-8">
-          <div className="text-center mb-6">
-            <Crosshair className="h-10 w-10 text-gold mx-auto" style={{ animation: "var(--animate-pulse-glow)" }} />
-            <h1 className="text-2xl font-bold mt-3 gradient-gold-text">Join the League</h1>
-            <p className="text-xs text-muted-foreground mt-1">Get 1,000 starter tokens on signup.</p>
-          </div>
-          <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
-            <div>
-              <Label htmlFor="name">Full name</Label>
-              <Input id="name" placeholder="Marco Reyes" />
+      <div className="container mx-auto px-4 py-12 max-w-xl">
+        <Card className="p-8 backdrop-blur-xl bg-card/60 border-primary/30">
+          <h1 className="text-3xl font-bold text-primary mb-1">Join the League</h1>
+          <p className="text-sm text-muted-foreground mb-6">Pick your gang. Earn your tokens.</p>
+          <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2"><Label>Full name *</Label><Input required value={f.full_name} onChange={(e) => set("full_name", e.target.value)} /></div>
+            <div><Label>Email *</Label><Input type="email" required value={f.email} onChange={(e) => set("email", e.target.value)} /></div>
+            <div><Label>Password *</Label><Input type="password" required minLength={6} value={f.password} onChange={(e) => set("password", e.target.value)} /></div>
+            <div><Label>Phone</Label><Input value={f.phone} onChange={(e) => set("phone", e.target.value)} /></div>
+            <div><Label>Discord</Label><Input value={f.discord_username} onChange={(e) => set("discord_username", e.target.value)} /></div>
+            <div><Label>Country</Label><Input value={f.country} onChange={(e) => set("country", e.target.value)} /></div>
+            <div><Label>Gang name</Label><Input value={f.gang_name} onChange={(e) => set("gang_name", e.target.value)} /></div>
+            <div className="md:col-span-2"><Label>Gang type</Label>
+              <Select value={f.gang_type} onValueChange={(v) => set("gang_type", v)}>
+                <SelectTrigger><SelectValue placeholder="Select gang type" /></SelectTrigger>
+                <SelectContent><SelectItem value="G">G — Gold Gang</SelectItem><SelectItem value="F">F — Fire Gang</SelectItem></SelectContent>
+              </Select>
             </div>
-            <div>
-              <Label htmlFor="alias">Alias</Label>
-              <Input id="alias" placeholder="Halo" />
+            <div className="md:col-span-2 flex items-start gap-2 text-sm">
+              <Checkbox id="terms" checked={accepted} onCheckedChange={(v) => setAccepted(!!v)} />
+              <label htmlFor="terms" className="text-muted-foreground">I accept the platform terms. Virtual tokens only — not real money.</label>
             </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@lsl.dev" />
-            </div>
-            <div>
-              <Label htmlFor="gang">Gang</Label>
-              <select id="gang" className="w-full h-9 rounded-md bg-input border border-[var(--glass-border)] px-3 text-sm">
-                <option value="">— Choose your gang —</option>
-                {gangs.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="pw">Password</Label>
-              <Input id="pw" type="password" placeholder="••••••••" />
-            </div>
-            <Button className="w-full btn-luxury">Create account</Button>
+            <Button type="submit" disabled={loading} className="md:col-span-2 w-full">{loading ? "Creating..." : "Create Account"}</Button>
           </form>
-          <div className="text-center text-xs text-muted-foreground mt-4">
-            Already a member? <Link to="/login" className="text-gold hover:underline">Sign in</Link>
-          </div>
+          <p className="mt-4 text-sm text-center">Already a member? <Link to="/login" className="text-primary hover:underline">Sign in</Link></p>
         </Card>
       </div>
     </Layout>
