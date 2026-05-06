@@ -118,7 +118,7 @@ function UsersPanel() {
     if (error) toast.error(error.message); else load();
   }
   async function removeRole(id: string, role: string) {
-    const { error } = await supabase.from("user_roles").delete().eq("user_id", id).eq("role", role);
+    const { error } = await supabase.from("user_roles").delete().eq("user_id", id).eq("role", role as AppRole);
     if (error) toast.error(error.message); else load();
   }
 
