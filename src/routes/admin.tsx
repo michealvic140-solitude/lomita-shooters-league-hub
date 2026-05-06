@@ -109,7 +109,8 @@ function UsersPanel() {
     if (error) toast.error(error.message); else { toast.success("Updated"); load(); }
   }
   async function toggle(id: string, field: "is_banned" | "is_muted" | "is_restricted", val: boolean) {
-    const { error } = await supabase.from("profiles").update({ [field]: val }).eq("id", id);
+    const patch: any = { [field]: val };
+    const { error } = await supabase.from("profiles").update(patch).eq("id", id);
     if (error) toast.error(error.message); else load();
   }
   async function addRole(id: string, role: AppRole) {
@@ -190,7 +191,7 @@ function MatchesPanel() {
   }
 
   async function setStatus(id: string, status: string) {
-    const { error } = await supabase.from("matches").update({ status }).eq("id", id);
+    const { error } = await supabase.from("matches").update({ status: status as any }).eq("id", id);
     if (error) toast.error(error.message); else load();
   }
   async function settle(id: string) {
@@ -266,8 +267,8 @@ function TokensPanel() {
     toast.success("Approved"); load();
   }
   async function reject(r: any) {
-    await supabase.from("token_requests").update({ status: "rejected", reviewed_at: new Date().toISOString() }).eq("id", r.id);
-    await supabase.from("notifications").insert({ user_id: r.user_id, title: "Token request rejected", body: `Your request for ${r.amount} tokens was rejected.` });
+    await supabase.from("token_requests").update({ status: "denied", reviewed_at: new Date().toISOString() }).eq("id", r.id);
+    await supabase.from("notifications").insert({ user_id: r.user_id, title: "Token request denied", body: `Your request for ${r.amount} tokens was denied.` });
     load();
   }
 
@@ -301,7 +302,7 @@ function TicketsPanel() {
       .then(({ data }) => setTickets(data ?? []));
   }, []);
   async function setStatus(id: string, status: string) {
-    await supabase.from("support_tickets").update({ status }).eq("id", id);
+    await supabase.from("support_tickets").update({ status: status as any }).eq("id", id);
     setTickets((t) => t.map((x) => x.id === id ? { ...x, status } : x));
   }
   return (
