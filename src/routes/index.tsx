@@ -93,6 +93,8 @@ function Index() {
         </section>
       )}
 
+      <AnnouncementSlider />
+
       <section className="container grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-10">
           {loading && <p className="text-muted-foreground">Loading league…</p>}
@@ -137,6 +139,9 @@ function Index() {
           </Card>
         </aside>
       </section>
+
+      <HighlightsRow />
+      <AdsRow />
     </Layout>
   );
 }
