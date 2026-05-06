@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 
 export function Countdown({ target }: { target: string }) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
+    setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+  if (now === null) return <span className="font-mono tabular-nums opacity-60">--:--</span>;
   const diff = Math.max(0, new Date(target).getTime() - now);
   const h = Math.floor(diff / 3_600_000);
   const m = Math.floor((diff % 3_600_000) / 60_000);
