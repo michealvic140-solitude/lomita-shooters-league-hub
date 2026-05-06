@@ -1,107 +1,105 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { matches, type Match } from "@/lib/mock-data";
+import { Button } from "@/components/ui/button";
 import { Countdown } from "@/components/Countdown";
-import { ArrowLeft, MapPin, Crosshair } from "lucide-react";
+import { fetchMatch, teamColor, type MatchRow } from "@/lib/queries";
+import { useBetSlip } from "@/contexts/BetSlipContext";
+import { ArrowLeft, MapPin, Trophy } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/matches/$matchId")({
-  loader: ({ params }) => {
-    const match = matches.find((m) => m.id === params.matchId);
-    if (!match) throw notFound();
-    return { match };
-  },
-  head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData?.match.home.name} vs ${loaderData?.match.away.name} — LSL` },
-      { name: "description", content: `Live odds and stats for ${loaderData?.match.name}.` },
-    ],
-  }),
-  component: MatchDetail,
-  notFoundComponent: () => (
-    <Layout>
-      <div className="container py-20 text-center">
-        <h1 className="text-3xl font-bold">Match not found</h1>
-        <Link to="/matches"><Button className="mt-4 btn-luxury">Back to matches</Button></Link>
-      </div>
-    </Layout>
-  ),
+  head: ({ params }) => ({ meta: [{ title: `Match ${params.matchId} — LSL` }, { name: "description", content: "Match details, markets and odds." }] }),
+  component: Page,
 });
 
-function MatchDetail() {
-  const { match } = Route.useLoaderData() as { match: Match };
+function Page() {
+  const { matchId } = Route.useParams();
+  const [m, setM] = useState<MatchRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { selections, add, remove } = useBetSlip();
+
+  useEffect(() => {
+    fetchMatch(matchId).then(setM).finally(() => setLoading(false));
+    const ch = supabase.channel(`m-${matchId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, () => fetchMatch(matchId).then(setM))
+      .on("postgres_changes", { event: "*", schema: "public", table: "odds" }, () => fetchMatch(matchId).then(setM))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [matchId]);
+
+  if (loading) return <Layout><div className="container py-10">Loading…</div></Layout>;
+  if (!m) return <Layout><div className="container py-10">Match not found. <Link to="/matches" className="text-primary underline">Back</Link></div></Layout>;
+
+  const home = m.home_team?.name ?? "Home";
+  const away = m.away_team?.name ?? "Away";
+  const selectedOdd = selections.find((s) => s.match_id === m.id)?.odd_id;
+
   return (
     <Layout>
-      <div className="container py-8">
-        <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold">
-          <ArrowLeft className="h-4 w-4" /> All matches
-        </Link>
-
-        <Card className="glass-strong p-6 md:p-10 mt-4 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-emerald opacity-5" />
-          <div className="relative">
-            <div className="flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
-              <span>{match.name}</span>
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{match.location}</span>
+      <div className="container py-10 max-w-5xl">
+        <Link to="/matches" className="text-muted-foreground text-sm flex items-center gap-1 hover:text-primary"><ArrowLeft className="h-4 w-4" />All matches</Link>
+        <Card className="glass-strong p-6 mt-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{m.name}</span>
+            <span className="flex items-center gap-3">
+              {m.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{m.location}</span>}
+              {m.is_featured && <Badge variant="outline" className="border-primary/40 text-primary">Featured</Badge>}
+            </span>
+          </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 mt-6">
+            <Side name={home} score={m.home_score} status={m.status} />
+            <div className="text-center">
+              <div className="text-[10px] tracking-widest text-muted-foreground">{m.status.toUpperCase()}</div>
+              {m.status === "scheduled" ? <Countdown target={m.start_time} /> : <div className="text-xl font-bold gradient-gold-text">{m.home_score} — {m.away_score}</div>}
             </div>
-
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 mt-6">
-              <div className="text-center">
-                <div className="h-20 w-20 mx-auto rounded-full ring-4 ring-[var(--glass-border)]" style={{ background: match.home.color }} />
-                <div className="font-bold mt-3 text-lg">{match.home.name}</div>
-                <div className="text-xs text-muted-foreground tracking-widest">{match.home.tag}</div>
-                <div className="text-5xl font-bold gradient-gold-text mt-2">{match.homeScore}</div>
-              </div>
-              <div className="text-center">
-                <Crosshair className="h-10 w-10 text-gold mx-auto" style={{ animation: "var(--animate-pulse-glow)" }} />
-                <div className="text-xs text-muted-foreground mt-2 uppercase tracking-widest">VS</div>
-                {match.status === "scheduled" && <div className="mt-2 text-sm"><Countdown target={match.startTime} /></div>}
-                {match.status === "live" && <Badge className="mt-2 bg-destructive">● LIVE</Badge>}
-                {match.status === "ended" && <Badge className="mt-2 bg-emerald text-[var(--primary-foreground)]">Final</Badge>}
-              </div>
-              <div className="text-center">
-                <div className="h-20 w-20 mx-auto rounded-full ring-4 ring-[var(--glass-border)]" style={{ background: match.away.color }} />
-                <div className="font-bold mt-3 text-lg">{match.away.name}</div>
-                <div className="text-xs text-muted-foreground tracking-widest">{match.away.tag}</div>
-                <div className="text-5xl font-bold gradient-gold-text mt-2">{match.awayScore}</div>
-              </div>
-            </div>
+            <Side name={away} score={m.away_score} status={m.status} align="right" />
           </div>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
-          <Card className="glass p-5">
-            <h3 className="font-bold text-lg mb-4">{match.market}</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {match.odds.map((o) => (
-                <button key={o.id}
-                  className="px-3 py-3 rounded-md bg-secondary/40 border border-[var(--glass-border)] hover:border-[var(--gold)]/70 transition">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{o.label}</div>
-                  <div className="text-lg font-bold gradient-gold-text">{o.value.toFixed(2)}</div>
-                </button>
-              ))}
-            </div>
-          </Card>
-          <Card className="glass p-5">
-            <h3 className="font-bold text-lg mb-4">Round Stats</h3>
-            <div className="space-y-3 text-sm">
-              {[
-                { l: "Avg accuracy", v: "67%" },
-                { l: "Avg headshot rate", v: "31%" },
-                { l: "Round duration", v: "8m 12s" },
-                { l: "Crowd size", v: "1,284" },
-              ].map((s) => (
-                <div key={s.l} className="flex justify-between border-b border-[var(--glass-border)] pb-2">
-                  <span className="text-muted-foreground">{s.l}</span>
-                  <span className="font-bold text-gold">{s.v}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+        <h2 className="text-xl font-bold mt-8 mb-3 flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" />Markets</h2>
+        {m.markets.length === 0 && <p className="text-muted-foreground text-sm">No markets yet.</p>}
+        <div className="space-y-3">
+          {m.markets.map((mk) => (
+            <Card key={mk.id} className="glass p-4">
+              <div className="flex items-center justify-between">
+                <div className="font-bold">{mk.name}</div>
+                <Badge variant="outline" className={mk.is_open ? "border-accent/40 text-accent" : "border-muted text-muted-foreground"}>
+                  {mk.is_open ? "Open" : "Closed"}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+                {mk.odds.map((o) => {
+                  const sel = selectedOdd === o.id;
+                  const locked = !mk.is_open || m.status !== "scheduled";
+                  return (
+                    <Button key={o.id} variant={sel ? "default" : "outline"} disabled={locked}
+                      onClick={() => sel ? remove(o.id) : add({ match_id: m.id, match_name: `${home} vs ${away}`, market_id: mk.id, market_name: mk.name, odd_id: o.id, selection_label: o.label, odds: Number(o.value) })}>
+                      <span className="text-xs">{o.label}</span>
+                      <span className="ml-2 font-mono">{Number(o.value).toFixed(2)}</span>
+                      {o.is_winner && <Badge className="ml-2 bg-accent text-accent-foreground">W</Badge>}
+                    </Button>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
     </Layout>
+  );
+}
+
+function Side({ name, score, status, align = "left" }: { name: string; score: number; status: string; align?: "left" | "right" }) {
+  return (
+    <div className={`flex items-center gap-3 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+      <div className="h-14 w-14 rounded-lg shrink-0" style={{ background: teamColor(name) }} />
+      <div className="min-w-0">
+        <div className="font-bold truncate text-lg">{name}</div>
+        <div className="text-xs text-muted-foreground">{status === "scheduled" ? "—" : `Score ${score}`}</div>
+      </div>
+    </div>
   );
 }
