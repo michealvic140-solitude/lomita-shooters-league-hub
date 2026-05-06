@@ -112,13 +112,17 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { BetSlipProvider } from "@/contexts/BetSlipContext";
 import { Toaster } from "@/components/ui/sonner";
 
+import { MaintenanceGate } from "@/components/MaintenanceGate";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BetSlipProvider>
-          <Outlet />
+          <MaintenanceGate>
+            <Outlet />
+          </MaintenanceGate>
           <Toaster />
         </BetSlipProvider>
       </AuthProvider>
