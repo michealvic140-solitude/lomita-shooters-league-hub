@@ -84,15 +84,55 @@ export const Layout = ({ children }: { children: ReactNode }) => {
         </div>
       </nav>
       <div className="md:hidden h-20" />
-      <footer className="border-t border-border mt-20 backdrop-blur-xl bg-card/40">
-        <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <div className="font-bold tracking-widest mb-2 text-primary">LOMITA SHOOTERS LEAGUE</div>
-          <p>Virtual token-only platform · No real money gambling</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+function SiteFooter() {
+  const [s, setS] = useState<any>(null);
+  const [open, setOpen] = useState<"terms" | "about" | null>(null);
+  useEffect(() => { supabase.from("app_settings").select("*").eq("id", 1).maybeSingle().then(({ data }) => setS(data)); }, []);
+  return (
+    <footer className="border-t border-border mt-20 backdrop-blur-xl bg-card/40">
+      <div className="container mx-auto px-4 py-10 grid md:grid-cols-3 gap-6 text-sm">
+        <div>
+          <div className="font-bold tracking-widest text-primary mb-2">LOMITA SHOOTERS LEAGUE</div>
+          <p className="text-muted-foreground text-xs">Virtual token-only platform · No real money gambling.</p>
+        </div>
+        <div>
+          <div className="font-bold mb-2">About</div>
+          <p className="text-muted-foreground text-xs line-clamp-3">{s?.about_us ?? "The premier virtual shooting circuit."}</p>
+          <div className="flex gap-3 mt-2 text-xs">
+            <button className="text-primary hover:underline" onClick={() => setOpen("about")}>Read more</button>
+            <button className="text-primary hover:underline" onClick={() => setOpen("terms")}>Terms & Conditions</button>
+          </div>
+        </div>
+        <div>
+          <div className="font-bold mb-2">Contact</div>
+          <ul className="text-muted-foreground text-xs space-y-1">
+            {s?.contact_email && <li>Email: <a href={`mailto:${s.contact_email}`} className="text-primary">{s.contact_email}</a></li>}
+            {s?.contact_phone && <li>Phone: {s.contact_phone}</li>}
+            {s?.contact_whatsapp && <li>WhatsApp: {s.contact_whatsapp}</li>}
+          </ul>
+        </div>
+      </div>
+      <Dialog open={!!open} onOpenChange={(v) => !v && setOpen(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{open === "terms" ? "Terms & Conditions" : "About Us"}</DialogTitle></DialogHeader>
+          <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+            {open === "terms" ? (s?.terms_content ?? "Terms not set.") : (s?.about_us ?? "About not set.")}
+            {open === "about" && s?.why_trust_us && <><div className="font-bold mt-4 text-foreground">Why trust us</div>{s.why_trust_us}</>}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </footer>
+  );
+}
 
 function MobLink({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
   return (
