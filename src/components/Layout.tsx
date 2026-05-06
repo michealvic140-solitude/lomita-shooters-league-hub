@@ -41,7 +41,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
                   <span className="text-xs text-muted-foreground">Tokens</span>
                   <span className="text-sm font-bold text-primary">{profile.token_balance.toLocaleString()}</span>
                 </div>
-                <Link to="/notifications"><Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button></Link>
+                <NotificationBell />
                 <Link to="/profile">
                   <Button variant="ghost" size="sm" className="gap-2">
                     <UserIcon className="h-4 w-4" />
