@@ -114,6 +114,8 @@ import { Toaster } from "@/components/ui/sonner";
 
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { BanGate } from "@/components/BanGate";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
+import { PopupAd } from "@/components/PopupAd";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -121,11 +123,14 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BetSlipProvider>
-          <MaintenanceGate>
-            <Outlet />
-          </MaintenanceGate>
-          <BanGate />
-          <Toaster />
+          <ConfirmProvider>
+            <MaintenanceGate>
+              <Outlet />
+            </MaintenanceGate>
+            <BanGate />
+            <PopupAd />
+            <Toaster />
+          </ConfirmProvider>
         </BetSlipProvider>
       </AuthProvider>
     </QueryClientProvider>
