@@ -54,13 +54,21 @@ function RegisterPage() {
             <div><Label>Phone</Label><Input value={f.phone} onChange={(e) => set("phone", e.target.value)} /></div>
             <div><Label>Discord</Label><Input value={f.discord_username} onChange={(e) => set("discord_username", e.target.value)} /></div>
             <div><Label>Country</Label><Input value={f.country} onChange={(e) => set("country", e.target.value)} /></div>
-            <div><Label>Gang name</Label><Input value={f.gang_name} onChange={(e) => set("gang_name", e.target.value)} /></div>
-            <div className="md:col-span-2"><Label>Gang type</Label>
+            <div className="md:col-span-2"><Label>Faction or Gang</Label>
               <Select value={f.gang_type} onValueChange={(v) => set("gang_type", v)}>
-                <SelectTrigger><SelectValue placeholder="Select gang type" /></SelectTrigger>
-                <SelectContent><SelectItem value="G">G — Gold Gang</SelectItem><SelectItem value="F">F — Fire Gang</SelectItem></SelectContent>
+                <SelectTrigger><SelectValue placeholder="Select F (Faction) or G (Gang)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="F">F — Faction</SelectItem>
+                  <SelectItem value="G">G — Gang</SelectItem>
+                </SelectContent>
               </Select>
             </div>
+            {f.gang_type && (
+              <div className="md:col-span-2">
+                <Label>{f.gang_type === "F" ? "Faction name" : "Gang name"} *</Label>
+                <Input required placeholder={`Enter your ${f.gang_type === "F" ? "faction" : "gang"} name`} value={f.gang_name} onChange={(e) => set("gang_name", e.target.value)} />
+              </div>
+            )}
             <div className="md:col-span-2 flex items-start gap-2 text-sm">
               <Checkbox id="terms" checked={accepted} onCheckedChange={(v) => setAccepted(!!v)} />
               <label htmlFor="terms" className="text-muted-foreground">I accept the platform terms. Virtual tokens only — not real money.</label>

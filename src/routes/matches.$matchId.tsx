@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Countdown } from "@/components/Countdown";
-import { fetchMatch, teamColor, type MatchRow } from "@/lib/queries";
+import { fetchMatch, type MatchRow } from "@/lib/queries";
+import { TeamLogo } from "@/components/TeamLogo";
 import { useBetSlip } from "@/contexts/BetSlipContext";
 import { ArrowLeft, MapPin, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,12 +51,12 @@ function Page() {
             </span>
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 mt-6">
-            <Side name={home} score={m.home_score} status={m.status} />
+            <Side name={home} logo={m.home_team?.logo_url} score={m.home_score} status={m.status} />
             <div className="text-center">
               <div className="text-[10px] tracking-widest text-muted-foreground">{m.status.toUpperCase()}</div>
               {m.status === "scheduled" ? <Countdown target={m.start_time} /> : <div className="text-xl font-bold gradient-gold-text">{m.home_score} — {m.away_score}</div>}
             </div>
-            <Side name={away} score={m.away_score} status={m.status} align="right" />
+            <Side name={away} logo={m.away_team?.logo_url} score={m.away_score} status={m.status} align="right" />
           </div>
         </Card>
 
@@ -92,10 +93,10 @@ function Page() {
   );
 }
 
-function Side({ name, score, status, align = "left" }: { name: string; score: number; status: string; align?: "left" | "right" }) {
+function Side({ name, score, status, logo, align = "left" }: { name: string; score: number; status: string; logo?: string | null; align?: "left" | "right" }) {
   return (
     <div className={`flex items-center gap-3 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <div className="h-14 w-14 rounded-lg shrink-0" style={{ background: teamColor(name) }} />
+      <TeamLogo name={name} url={logo} size={56} rounded="md" />
       <div className="min-w-0">
         <div className="font-bold truncate text-lg">{name}</div>
         <div className="text-xs text-muted-foreground">{status === "scheduled" ? "—" : `Score ${score}`}</div>

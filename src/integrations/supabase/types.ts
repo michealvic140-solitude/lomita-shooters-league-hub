@@ -74,9 +74,14 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           contact_whatsapp: string | null
+          hero_tagline: string | null
           id: number
           maintenance_message: string | null
           maintenance_mode: boolean
+          popup_ad_active: boolean
+          popup_ad_image: string | null
+          popup_ad_link: string | null
+          popup_ad_text: string | null
           terms_content: string | null
           updated_at: string
           why_trust_us: string | null
@@ -86,9 +91,14 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           contact_whatsapp?: string | null
+          hero_tagline?: string | null
           id?: number
           maintenance_message?: string | null
           maintenance_mode?: boolean
+          popup_ad_active?: boolean
+          popup_ad_image?: string | null
+          popup_ad_link?: string | null
+          popup_ad_text?: string | null
           terms_content?: string | null
           updated_at?: string
           why_trust_us?: string | null
@@ -98,9 +108,14 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           contact_whatsapp?: string | null
+          hero_tagline?: string | null
           id?: number
           maintenance_message?: string | null
           maintenance_mode?: boolean
+          popup_ad_active?: boolean
+          popup_ad_image?: string | null
+          popup_ad_link?: string | null
+          popup_ad_text?: string | null
           terms_content?: string | null
           updated_at?: string
           why_trust_us?: string | null
