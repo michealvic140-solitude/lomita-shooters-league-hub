@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Countdown } from "./Countdown";
 import { Crosshair, Lock, MapPin } from "lucide-react";
 import type { MatchRow } from "@/lib/queries";
-import { teamColor } from "@/lib/queries";
+import { TeamLogo } from "@/components/TeamLogo";
 import { useBetSlip } from "@/contexts/BetSlipContext";
 
 export function MatchCardLive({ match }: { match: MatchRow }) {
@@ -28,12 +28,18 @@ export function MatchCardLive({ match }: { match: MatchRow }) {
           {match.location && <span className="flex items-center gap-1 shrink-0"><MapPin className="h-3 w-3" />{match.location}</span>}
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mt-3">
-          <Team name={homeName} color={teamColor(homeName)} score={match.home_score} status={match.status} align="left" />
+          <div className="flex items-center gap-2 min-w-0">
+            <TeamLogo name={homeName} url={match.home_team?.logo_url} size={36} rounded="full" />
+            <div className="min-w-0"><div className="font-bold truncate text-sm">{homeName}</div><div className="text-[10px] text-muted-foreground">{match.status === "scheduled" ? "—" : match.home_score}</div></div>
+          </div>
           <div className="text-center">
             <div className="text-[10px] text-muted-foreground">VS</div>
             <Crosshair className="h-5 w-5 text-primary mx-auto" />
           </div>
-          <Team name={awayName} color={teamColor(awayName)} score={match.away_score} status={match.status} align="right" />
+          <div className="flex items-center gap-2 flex-row-reverse text-right min-w-0">
+            <TeamLogo name={awayName} url={match.away_team?.logo_url} size={36} rounded="full" />
+            <div className="min-w-0"><div className="font-bold truncate text-sm">{awayName}</div><div className="text-[10px] text-muted-foreground">{match.status === "scheduled" ? "—" : match.away_score}</div></div>
+          </div>
         </div>
         <div className="mt-3 text-xs text-muted-foreground text-center">
           {match.status === "scheduled" && <>Starts in <Countdown target={match.start_time} /></>}
@@ -81,14 +87,3 @@ export function MatchCardLive({ match }: { match: MatchRow }) {
   );
 }
 
-function Team({ name, color, score, status, align }: { name: string; color: string; score: number; status: string; align: "left" | "right" }) {
-  return (
-    <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <div className="h-9 w-9 rounded-md shrink-0" style={{ background: color }} />
-      <div className="min-w-0">
-        <div className="font-bold truncate text-sm">{name}</div>
-        <div className="text-[10px] text-muted-foreground">{status === "scheduled" ? "—" : score}</div>
-      </div>
-    </div>
-  );
-}
