@@ -22,6 +22,7 @@ function SupportPage() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { if (!user) nav({ to: "/login" }); }, [user, nav]);
@@ -31,7 +32,14 @@ function SupportPage() {
     const { data } = await supabase.from("support_tickets").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
     setTickets(data ?? []);
   };
-  useEffect(() => { load(); }, [user?.id]);
+  useEffect(() => {
+    load();
+    if (!user) return;
+    const ch = supabase.channel(`my-tickets-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets", filter: `user_id=eq.${user.id}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
   if (!user) return null;
 
   const create = async () => {
@@ -40,17 +48,20 @@ function SupportPage() {
     try {
       const { data: ticket, error } = await supabase.from("support_tickets").insert({ user_id: user.id, subject }).select().single();
       if (error) throw error;
-      await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, user_id: user.id, content: message });
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        const path = `${ticket.id}/${Date.now()}-${imageFile.name}`;
+        const { error: ue } = await supabase.storage.from("ticket-uploads").upload(path, imageFile);
+        if (!ue) imageUrl = supabase.storage.from("ticket-uploads").getPublicUrl(path).data.publicUrl;
+      }
+      await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, user_id: user.id, content: message, image_url: imageUrl });
 
-      // Try AI auto-reply
       try {
         const { data: ai } = await supabase.functions.invoke("ai-support", { body: { subject, message } });
-        if (ai?.reply) {
-          await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, user_id: user.id, content: ai.reply, is_ai: true });
-        }
+        if (ai?.reply) await supabase.from("ticket_messages").insert({ ticket_id: ticket.id, user_id: user.id, content: ai.reply, is_ai: true });
       } catch {/* non-fatal */}
 
-      setSubject(""); setMessage("");
+      setSubject(""); setMessage(""); setImageFile(null);
       toast.success("Ticket created");
       nav({ to: "/ticket/$id", params: { id: ticket.id } });
     } catch (e: any) { toast.error(e.message); }
