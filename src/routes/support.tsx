@@ -83,6 +83,11 @@ function SupportPage() {
             <label className="text-xs uppercase tracking-widest text-muted-foreground">Message</label>
             <Textarea rows={5} placeholder="Tell us what happened…" value={message} onChange={(e) => setMessage(e.target.value)} />
           </div>
+          <div>
+            <label className="text-xs uppercase tracking-widest text-muted-foreground">Attach screenshot (optional)</label>
+            <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} />
+            {imageFile && <p className="text-[10px] text-muted-foreground mt-1">{imageFile.name}</p>}
+          </div>
           <Button className="btn-luxury w-full" disabled={submitting} onClick={create}>
             <Sparkles className="h-4 w-4 mr-1" />{submitting ? "Creating…" : "Create ticket + get instant AI reply"}
           </Button>
