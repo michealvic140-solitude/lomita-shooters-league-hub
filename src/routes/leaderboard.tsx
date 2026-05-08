@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Coins, TrendingUp } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/leaderboard")({
@@ -12,30 +11,75 @@ export const Route = createFileRoute("/leaderboard")({
   component: Page,
 });
 
+function rankIcon(i: number) {
+  if (i === 0) return "🥇"; if (i === 1) return "🥈"; if (i === 2) return "🥉";
+  return `#${i + 1}`;
+}
+
+type Stats = { name: string; top_player?: string; W: number; L: number; D: number; PTS: number; P: number; manual_rank?: number | null };
+
 function Page() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [gangs, setGangs] = useState<any[]>([]);
+  const [shooters, setShooters] = useState<Stats[]>([]);
+  const [gangs, setGangs] = useState<Stats[]>([]);
 
   useEffect(() => {
-    supabase.from("profiles")
-      .select("id,full_name,gang_name,gang_type,token_balance,avatar_url")
-      .order("token_balance", { ascending: false })
-      .limit(50)
-      .then(({ data }) => setUsers(data ?? []));
-    supabase.from("profiles")
-      .select("gang_name,gang_type,token_balance")
-      .not("gang_name", "is", null)
-      .then(({ data }) => {
-        const map = new Map<string, { name: string; type: string | null; total: number; members: number }>();
-        (data ?? []).forEach((p: any) => {
-          if (!p.gang_name) return;
-          const k = p.gang_name;
-          const cur = map.get(k) ?? { name: k, type: p.gang_type, total: 0, members: 0 };
-          cur.total += p.token_balance ?? 0; cur.members += 1;
-          map.set(k, cur);
-        });
-        setGangs(Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30));
+    (async () => {
+      // matches finished
+      const { data: matches } = await supabase.from("matches").select("home_team_id,away_team_id,home_score,away_score,winner_team_id,status").eq("status", "ended");
+      const { data: teams } = await supabase.from("teams").select("id,name");
+      const { data: players } = await supabase.from("players").select("id,name,team_id");
+      const { data: overrides } = await supabase.from("leaderboard_overrides").select("*");
+
+      const teamMap = new Map<string, string>(); (teams ?? []).forEach((t) => teamMap.set(t.id, t.name));
+      const teamPlayers = new Map<string, string[]>();
+      (players ?? []).forEach((p) => { const a = teamPlayers.get(p.team_id) ?? []; a.push(p.name); teamPlayers.set(p.team_id, a); });
+
+      const gangAgg = new Map<string, Stats>();
+      const playerAgg = new Map<string, Stats>();
+
+      (matches ?? []).forEach((m: any) => {
+        for (const side of ["home", "away"] as const) {
+          const tid = side === "home" ? m.home_team_id : m.away_team_id;
+          const tname = teamMap.get(tid) || "Team";
+          const won = m.winner_team_id === tid;
+          const draw = m.winner_team_id == null;
+          const cur = gangAgg.get(tname) ?? { name: tname, top_player: (teamPlayers.get(tid) ?? [])[0], W: 0, L: 0, D: 0, PTS: 0, P: 0 };
+          cur.P += 1;
+          if (draw) { cur.D += 1; cur.PTS += 1; }
+          else if (won) { cur.W += 1; cur.PTS += 3; }
+          else { cur.L += 1; }
+          gangAgg.set(tname, cur);
+          // shooters: each player on team
+          (teamPlayers.get(tid) ?? []).forEach((pname) => {
+            const pc = playerAgg.get(pname) ?? { name: pname, W: 0, L: 0, D: 0, PTS: 0, P: 0 };
+            pc.P += 1;
+            if (draw) { pc.D += 1; pc.PTS += 1; }
+            else if (won) { pc.W += 1; pc.PTS += 3; }
+            else { pc.L += 1; }
+            playerAgg.set(pname, pc);
+          });
+        }
       });
+
+      // apply overrides
+      (overrides ?? []).forEach((o: any) => {
+        const target = o.kind === "gang" ? gangAgg : playerAgg;
+        target.set(o.name, {
+          name: o.name, top_player: o.top_player ?? undefined,
+          W: o.wins, L: o.losses, D: o.draws, P: o.played, PTS: o.points,
+          manual_rank: o.manual_rank,
+        });
+      });
+
+      const sortFn = (a: Stats, b: Stats) => {
+        if (a.manual_rank != null && b.manual_rank != null) return a.manual_rank - b.manual_rank;
+        if (a.manual_rank != null) return -1;
+        if (b.manual_rank != null) return 1;
+        return b.PTS - a.PTS || b.W - a.W;
+      };
+      setGangs(Array.from(gangAgg.values()).sort(sortFn));
+      setShooters(Array.from(playerAgg.values()).sort(sortFn));
+    })();
   }, []);
 
   return (
@@ -45,47 +89,70 @@ function Page() {
           <Trophy className="h-7 w-7 text-primary" />
           <h1 className="text-3xl font-bold gradient-gold-text">Leaderboard</h1>
         </div>
-        <Tabs defaultValue="shooters">
+        <Tabs defaultValue="gangs">
           <TabsList>
+            <TabsTrigger value="gangs">Top Gangs / Factions</TabsTrigger>
             <TabsTrigger value="shooters">Top Shooters</TabsTrigger>
-            <TabsTrigger value="gangs">Top Gangs</TabsTrigger>
           </TabsList>
-          <TabsContent value="shooters" className="mt-4 space-y-2">
-            {users.length === 0 && <p className="text-muted-foreground text-sm">No shooters yet.</p>}
-            {users.map((u, i) => (
-              <Card key={u.id} className="glass p-3 flex items-center gap-3">
-                <div className="text-2xl font-bold gradient-gold-text w-10 text-center">{i + 1}</div>
-                <div className="h-10 w-10 rounded-full bg-gradient-gold grid place-items-center text-primary-foreground font-bold text-xs">
-                  {(u.full_name ?? "?").slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold truncate">{u.full_name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{u.gang_name ?? "Independent"}{u.gang_type && ` · ${u.gang_type}`}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-primary flex items-center gap-1"><Coins className="h-3 w-3" />{u.token_balance.toLocaleString()}</div>
-                </div>
-              </Card>
-            ))}
+
+          <TabsContent value="gangs" className="mt-4">
+            <Card className="glass overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-card/40">
+                  <tr className="text-left text-xs uppercase tracking-widest text-muted-foreground">
+                    <Th>Rank</Th><Th>Gang / Faction</Th><Th>Top Player</Th>
+                    <Th right>W</Th><Th right>L</Th><Th right>D</Th><Th right>P</Th><Th right>PTS</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gangs.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No data yet.</td></tr>}
+                  {gangs.map((g, i) => (
+                    <tr key={g.name} className="border-b border-border/40 hover:bg-primary/5">
+                      <Td><span className="text-lg font-bold">{rankIcon(i)}</span></Td>
+                      <Td><span className="font-bold">{g.name}</span></Td>
+                      <Td><span className="text-muted-foreground">{g.top_player || "—"}</span></Td>
+                      <Td right><span className="text-emerald-400 font-bold">{g.W}</span></Td>
+                      <Td right><span className="text-destructive font-bold">{g.L}</span></Td>
+                      <Td right><span className="text-amber-400 font-bold">{g.D}</span></Td>
+                      <Td right>{g.P}</Td>
+                      <Td right><span className="font-bold text-primary">{g.PTS}</span></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
           </TabsContent>
-          <TabsContent value="gangs" className="mt-4 space-y-2">
-            {gangs.length === 0 && <p className="text-muted-foreground text-sm">No gangs yet.</p>}
-            {gangs.map((g, i) => (
-              <Card key={g.name} className="glass p-3 flex items-center gap-3">
-                <div className="text-2xl font-bold gradient-gold-text w-10 text-center">{i + 1}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold truncate">{g.name}</div>
-                  <div className="text-xs text-muted-foreground">{g.members} members{g.type && ` · ${g.type}`}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-accent flex items-center gap-1"><TrendingUp className="h-3 w-3" />{g.total.toLocaleString()}</div>
-                  <Badge variant="outline" className="text-[10px]">total tokens</Badge>
-                </div>
-              </Card>
-            ))}
+
+          <TabsContent value="shooters" className="mt-4">
+            <Card className="glass overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-card/40">
+                  <tr className="text-left text-xs uppercase tracking-widest text-muted-foreground">
+                    <Th>Rank</Th><Th>Player</Th>
+                    <Th right>Won</Th><Th right>Lost</Th><Th right>Total</Th><Th right>PTS</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shooters.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No shooters yet.</td></tr>}
+                  {shooters.map((p, i) => (
+                    <tr key={p.name} className="border-b border-border/40 hover:bg-primary/5">
+                      <Td><span className="text-lg font-bold">{rankIcon(i)}</span></Td>
+                      <Td><span className="font-bold">{p.name}</span></Td>
+                      <Td right><span className="text-emerald-400 font-bold">{p.W}</span></Td>
+                      <Td right><span className="text-destructive font-bold">{p.L}</span></Td>
+                      <Td right>{p.P}</Td>
+                      <Td right><span className="font-bold text-primary">{p.PTS}</span></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
     </Layout>
   );
 }
+
+function Th({ children, right }: { children: React.ReactNode; right?: boolean }) { return <th className={`px-4 py-3 ${right ? "text-right" : ""}`}>{children}</th>; }
+function Td({ children, right }: { children: React.ReactNode; right?: boolean }) { return <td className={`px-4 py-3 ${right ? "text-right" : ""}`}>{children}</td>; }

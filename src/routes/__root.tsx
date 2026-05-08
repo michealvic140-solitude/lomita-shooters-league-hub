@@ -120,6 +120,7 @@ import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { BanGate } from "@/components/BanGate";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { PopupAd } from "@/components/PopupAd";
+import { BetSlipFab } from "@/components/BetSlip";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -133,6 +134,7 @@ function RootComponent() {
             </MaintenanceGate>
             <BanGate />
             <PopupAd />
+            <BetSlipFab />
             <Toaster />
           </ConfirmProvider>
         </BetSlipProvider>

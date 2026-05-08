@@ -12,12 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Switch } from "@/components/ui/switch";
 import {
   Shield, Users, Trophy, Coins, Megaphone, Settings as SettingsIcon, Ticket, AlertTriangle,
-  Calendar, Tag, Image as ImageIcon, BarChart3, History, Send, Plus, Trash2, Pencil, ChevronRight, ChevronLeft,
+  Calendar, Tag, Image as ImageIcon, BarChart3, History, Send, Plus, Trash2, Pencil, ChevronRight, ChevronLeft, Wallet, ListOrdered,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, ROLE_LABELS, type AppRole } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { fetchTeams } from "@/lib/queries";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — LSL" }, { name: "description", content: "League administration dashboard." }] }),
@@ -47,6 +48,8 @@ function AdminPage() {
             <TabsTrigger value="matches"><Trophy className="h-3 w-3 mr-1" />Matches</TabsTrigger>
             <TabsTrigger value="events"><Calendar className="h-3 w-3 mr-1" />Events</TabsTrigger>
             <TabsTrigger value="tokens"><Coins className="h-3 w-3 mr-1" />Tokens</TabsTrigger>
+            <TabsTrigger value="withdrawals"><Wallet className="h-3 w-3 mr-1" />Withdrawals</TabsTrigger>
+            <TabsTrigger value="leaderboard"><ListOrdered className="h-3 w-3 mr-1" />Leaderboard</TabsTrigger>
             <TabsTrigger value="promos"><Tag className="h-3 w-3 mr-1" />Promo Codes</TabsTrigger>
             <TabsTrigger value="content"><Megaphone className="h-3 w-3 mr-1" />Content</TabsTrigger>
             <TabsTrigger value="tickets"><Ticket className="h-3 w-3 mr-1" />Tickets</TabsTrigger>
@@ -60,6 +63,8 @@ function AdminPage() {
           <TabsContent value="matches" className="mt-4"><MatchesPanel /></TabsContent>
           <TabsContent value="events" className="mt-4"><EventsPanel /></TabsContent>
           <TabsContent value="tokens" className="mt-4"><TokensPanel /></TabsContent>
+          <TabsContent value="withdrawals" className="mt-4"><WithdrawalsPanel /></TabsContent>
+          <TabsContent value="leaderboard" className="mt-4"><LeaderboardAdminPanel /></TabsContent>
           <TabsContent value="promos" className="mt-4"><PromoPanel /></TabsContent>
           <TabsContent value="content" className="mt-4"><ContentPanel /></TabsContent>
           <TabsContent value="tickets" className="mt-4"><TicketsPanel /></TabsContent>
@@ -336,6 +341,7 @@ function UserEditDialog({ user, roles, onClose }: { user: any; roles: string[]; 
 
 /* ============================ MATCH WIZARD ============================ */
 function MatchesPanel() {
+  const confirm = useConfirm();
   const [matches, setMatches] = useState<any[]>([]);
   const [wizard, setWizard] = useState(false);
 
@@ -364,7 +370,7 @@ function MatchesPanel() {
     toast.success("Match settled — bets paid out"); load();
   }
   async function deleteMatch(id: string) {
-    if (!confirm("Delete this match? Cannot be undone.")) return;
+    if (!await confirm({ title: "Delete this match?", description: "This cannot be undone.", tone: "danger", confirmText: "Delete" })) return;
     const { error } = await supabase.from("matches").delete().eq("id", id);
     if (error) toast.error(error.message); else { logAudit("match_deleted", "match", id); load(); }
   }
@@ -930,16 +936,22 @@ function CategoriesPanel() {
 /* ============================ TICKETS ============================ */
 function TicketsPanel() {
   const [tickets, setTickets] = useState<any[]>([]);
+  const confirm = useConfirm();
+  async function load() {
+    const { data } = await supabase.from("support_tickets").select("*, profiles:user_id(full_name,email)").order("created_at", { ascending: false }).limit(200);
+    setTickets(data ?? []);
+  }
   useEffect(() => {
-    supabase.from("support_tickets").select("*, profiles:user_id(full_name,email)").order("created_at", { ascending: false }).limit(100)
-      .then(({ data }) => setTickets(data ?? []));
+    load();
+    const ch = supabase.channel("admin-tk").on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, load).subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
   async function setStatus(id: string, status: string) {
     await supabase.from("support_tickets").update({ status: status as any }).eq("id", id);
     setTickets((t) => t.map((x) => x.id === id ? { ...x, status } : x));
   }
   async function del(id: string) {
-    if (!confirm("Delete ticket?")) return;
+    if (!await confirm({ title: "Delete ticket?", tone: "danger", confirmText: "Delete" })) return;
     await supabase.from("support_tickets").delete().eq("id", id);
     setTickets((t) => t.filter((x) => x.id !== id));
   }
@@ -1189,6 +1201,7 @@ function AnalyticsPanel() {
 /* ============================ SETTINGS ============================ */
 function SettingsPanel() {
   const [s, setS] = useState<any>(null);
+  const confirm = useConfirm();
   useEffect(() => { supabase.from("app_settings").select("*").eq("id", 1).maybeSingle().then(({ data }) => setS(data ?? { id: 1 })); }, []);
   if (!s) return null;
   async function save() {
@@ -1196,30 +1209,168 @@ function SettingsPanel() {
     if (error) toast.error(error.message); else { toast.success("Saved"); logAudit("settings_updated", "settings"); }
   }
   async function wipe() {
-    if (!confirm("EMERGENCY: Wipe ALL user tokens to zero? This cannot be undone.")) return;
+    if (!await confirm({ title: "EMERGENCY: Wipe ALL user tokens?", description: "This sets every user's balance to 0 and cannot be undone.", tone: "danger", confirmText: "Wipe everything" })) return;
     const { error } = await supabase.rpc("wipe_all_tokens");
     if (error) toast.error(error.message); else toast.success("All tokens cleared");
+  }
+  async function uploadPopup(f: File) {
+    const path = `popup-${Date.now()}-${f.name}`;
+    const { error } = await supabase.storage.from("ads").upload(path, f, { upsert: true });
+    if (error) { toast.error(error.message); return; }
+    const url = supabase.storage.from("ads").getPublicUrl(path).data.publicUrl;
+    setS({ ...s, popup_ad_image: url });
   }
   return (
     <Card className="glass-strong p-4 space-y-3 max-w-2xl">
       <div className="flex items-center justify-between">
-        <div>
-          <div className="font-bold">Maintenance mode</div>
-          <div className="text-xs text-muted-foreground">Blocks all non-admin pages.</div>
-        </div>
+        <div><div className="font-bold">Maintenance mode</div><div className="text-xs text-muted-foreground">Blocks all non-admin pages.</div></div>
         <Switch checked={!!s.maintenance_mode} onCheckedChange={(v) => setS({ ...s, maintenance_mode: v })} />
       </div>
       <Textarea placeholder="Maintenance message" value={s.maintenance_message ?? ""} onChange={(e) => setS({ ...s, maintenance_message: e.target.value })} />
+      <div>
+        <label className="text-xs text-muted-foreground">Hero tagline (top of home page)</label>
+        <Input placeholder="Season 4 · Live" value={s.hero_tagline ?? ""} onChange={(e) => setS({ ...s, hero_tagline: e.target.value })} />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Minimum bet stake</label>
+        <Input type="number" placeholder="2000000" value={s.min_stake ?? 2000000} onChange={(e) => setS({ ...s, min_stake: Number(e.target.value) })} />
+      </div>
       <Input placeholder="Contact email" value={s.contact_email ?? ""} onChange={(e) => setS({ ...s, contact_email: e.target.value })} />
       <Input placeholder="Contact phone" value={s.contact_phone ?? ""} onChange={(e) => setS({ ...s, contact_phone: e.target.value })} />
       <Input placeholder="Contact WhatsApp" value={s.contact_whatsapp ?? ""} onChange={(e) => setS({ ...s, contact_whatsapp: e.target.value })} />
       <Textarea placeholder="About us" rows={3} value={s.about_us ?? ""} onChange={(e) => setS({ ...s, about_us: e.target.value })} />
       <Textarea placeholder="Why trust us" rows={3} value={s.why_trust_us ?? ""} onChange={(e) => setS({ ...s, why_trust_us: e.target.value })} />
       <Textarea placeholder="Terms & Conditions" rows={5} value={s.terms_content ?? ""} onChange={(e) => setS({ ...s, terms_content: e.target.value })} />
+
+      <div className="border-t border-border pt-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="font-bold">Pop-up Ad</div>
+          <Switch checked={!!s.popup_ad_active} onCheckedChange={(v) => setS({ ...s, popup_ad_active: v })} />
+        </div>
+        <Select value={s.popup_ad_size ?? "large"} onValueChange={(v) => setS({ ...s, popup_ad_size: v })}>
+          <SelectTrigger><SelectValue placeholder="Size" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="large">Large</SelectItem>
+            <SelectItem value="xl">Extra Large</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && uploadPopup(e.target.files[0])} />
+        {s.popup_ad_image && <img src={s.popup_ad_image} alt="" className="w-full max-h-48 object-contain rounded border border-border" />}
+        <Textarea placeholder="Popup text/HTML" rows={3} value={s.popup_ad_text ?? ""} onChange={(e) => setS({ ...s, popup_ad_text: e.target.value })} />
+        <Input placeholder="Popup link (optional)" value={s.popup_ad_link ?? ""} onChange={(e) => setS({ ...s, popup_ad_link: e.target.value })} />
+      </div>
+
       <div className="flex gap-2 flex-wrap">
         <Button className="btn-luxury" onClick={save}>Save settings</Button>
         <Button variant="destructive" onClick={wipe}><AlertTriangle className="h-4 w-4 mr-1" />Emergency: wipe all tokens</Button>
       </div>
     </Card>
+  );
+}
+
+/* ============================ WITHDRAWALS ============================ */
+function WithdrawalsPanel() {
+  const [list, setList] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, any>>({});
+  const confirm = useConfirm();
+  async function load() {
+    const { data } = await supabase.from("withdrawal_requests").select("*").order("created_at", { ascending: false });
+    setList(data ?? []);
+    const ids = Array.from(new Set((data ?? []).map((r: any) => r.user_id)));
+    if (ids.length) {
+      const { data: p } = await supabase.from("profiles").select("id,full_name,email,token_balance").in("id", ids);
+      const m: Record<string, any> = {}; (p ?? []).forEach((x: any) => { m[x.id] = x; }); setProfiles(m);
+    }
+  }
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("admin-wd").on("postgres_changes", { event: "*", schema: "public", table: "withdrawal_requests" }, load).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  async function decide(r: any, approve: boolean) {
+    const ok = await confirm({
+      title: approve ? "Approve withdrawal?" : "Decline withdrawal?",
+      description: approve ? "Tokens stay deducted; user will be notified." : "Tokens will be refunded to the user.",
+      tone: approve ? "default" : "danger",
+      confirmText: approve ? "Approve" : "Decline & refund",
+    });
+    if (!ok) return;
+    const note = window.prompt(approve ? "Instructions for user (optional)" : "Reason for declining (optional)") ?? "";
+    const { error } = await supabase.rpc("review_withdrawal_request", { _id: r.id, _approve: approve, _note: note || undefined });
+    if (error) toast.error(error.message); else { toast.success("Done"); logAudit(`withdrawal_${approve ? "approved" : "declined"}`, "withdrawal", r.id); load(); }
+  }
+
+  return (
+    <div className="space-y-2">
+      {list.length === 0 && <p className="text-sm text-muted-foreground">No withdrawal requests.</p>}
+      {list.map((r) => (
+        <Card key={r.id} className="glass p-3 flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="font-bold">{r.amount.toLocaleString()} tokens · <span className="text-primary">{r.ingame_name}</span> <span className="text-xs text-muted-foreground">({r.gang_name})</span></div>
+            <div className="text-xs text-muted-foreground">{profiles[r.user_id]?.full_name} · {profiles[r.user_id]?.email}</div>
+            {r.ticket_ref && <div className="text-xs">Ticket: <span className="font-mono">{r.ticket_ref}</span></div>}
+            <div className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
+            {r.admin_note && <div className="text-xs italic mt-1">"{r.admin_note}"</div>}
+          </div>
+          <Badge variant="outline" className="capitalize">{r.status}</Badge>
+          {r.status === "pending" && (
+            <div className="flex gap-1">
+              <Button size="sm" variant="outline" onClick={() => decide(r, false)}>Decline</Button>
+              <Button size="sm" className="btn-luxury" onClick={() => decide(r, true)}>Approve</Button>
+            </div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/* ============================ LEADERBOARD ADMIN ============================ */
+function LeaderboardAdminPanel() {
+  const [list, setList] = useState<any[]>([]);
+  const [draft, setDraft] = useState({ kind: "gang", name: "", top_player: "", wins: 0, losses: 0, draws: 0, played: 0, points: 0, manual_rank: "" });
+  async function load() { setList((await supabase.from("leaderboard_overrides").select("*").order("kind").order("manual_rank", { ascending: true, nullsFirst: false })).data ?? []); }
+  useEffect(() => { load(); }, []);
+  async function save() {
+    if (!draft.name) { toast.error("Name required"); return; }
+    const payload: any = { ...draft, manual_rank: draft.manual_rank ? Number(draft.manual_rank) : null };
+    await supabase.from("leaderboard_overrides").upsert(payload);
+    setDraft({ kind: "gang", name: "", top_player: "", wins: 0, losses: 0, draws: 0, played: 0, points: 0, manual_rank: "" });
+    load();
+  }
+  async function del(id: string) { await supabase.from("leaderboard_overrides").delete().eq("id", id); load(); }
+  return (
+    <div className="space-y-3">
+      <Card className="glass-strong p-4 space-y-2">
+        <div className="font-bold">Manual override (auto-stats are computed from match results)</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Select value={draft.kind} onValueChange={(v) => setDraft({ ...draft, kind: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="gang">Gang/Faction</SelectItem><SelectItem value="shooter">Shooter</SelectItem></SelectContent>
+          </Select>
+          <Input placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <Input placeholder="Top player (gang only)" value={draft.top_player} onChange={(e) => setDraft({ ...draft, top_player: e.target.value })} />
+          <Input placeholder="Manual rank #" value={draft.manual_rank} onChange={(e) => setDraft({ ...draft, manual_rank: e.target.value })} />
+          <Input type="number" placeholder="W" value={draft.wins} onChange={(e) => setDraft({ ...draft, wins: Number(e.target.value) })} />
+          <Input type="number" placeholder="L" value={draft.losses} onChange={(e) => setDraft({ ...draft, losses: Number(e.target.value) })} />
+          <Input type="number" placeholder="D" value={draft.draws} onChange={(e) => setDraft({ ...draft, draws: Number(e.target.value) })} />
+          <Input type="number" placeholder="Played" value={draft.played} onChange={(e) => setDraft({ ...draft, played: Number(e.target.value) })} />
+          <Input type="number" placeholder="Points" value={draft.points} onChange={(e) => setDraft({ ...draft, points: Number(e.target.value) })} />
+        </div>
+        <Button className="btn-luxury" onClick={save}><Plus className="h-4 w-4 mr-1" />Save override</Button>
+      </Card>
+      <div className="space-y-1">
+        {list.map((o) => (
+          <Card key={o.id} className="glass p-2 flex items-center gap-2 flex-wrap text-sm">
+            <Badge variant="outline" className="capitalize">{o.kind}</Badge>
+            <div className="font-bold flex-1 min-w-0 truncate">{o.name} {o.top_player && <span className="text-xs text-muted-foreground">· top: {o.top_player}</span>}</div>
+            <span className="text-xs text-muted-foreground">W {o.wins} · L {o.losses} · D {o.draws} · PTS {o.points}{o.manual_rank ? ` · #${o.manual_rank}` : ""}</span>
+            <Button size="sm" variant="destructive" onClick={() => del(o.id)}><Trash2 className="h-3 w-3" /></Button>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }

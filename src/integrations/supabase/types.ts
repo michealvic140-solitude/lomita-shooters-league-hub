@@ -78,9 +78,11 @@ export type Database = {
           id: number
           maintenance_message: string | null
           maintenance_mode: boolean
+          min_stake: number
           popup_ad_active: boolean
           popup_ad_image: string | null
           popup_ad_link: string | null
+          popup_ad_size: string
           popup_ad_text: string | null
           terms_content: string | null
           updated_at: string
@@ -95,9 +97,11 @@ export type Database = {
           id?: number
           maintenance_message?: string | null
           maintenance_mode?: boolean
+          min_stake?: number
           popup_ad_active?: boolean
           popup_ad_image?: string | null
           popup_ad_link?: string | null
+          popup_ad_size?: string
           popup_ad_text?: string | null
           terms_content?: string | null
           updated_at?: string
@@ -112,9 +116,11 @@ export type Database = {
           id?: number
           maintenance_message?: string | null
           maintenance_mode?: boolean
+          min_stake?: number
           popup_ad_active?: boolean
           popup_ad_image?: string | null
           popup_ad_link?: string | null
+          popup_ad_size?: string
           popup_ad_text?: string | null
           terms_content?: string | null
           updated_at?: string
@@ -400,6 +406,48 @@ export type Database = {
           media_type?: string
           media_url?: string
           title?: string
+        }
+        Relationships: []
+      }
+      leaderboard_overrides: {
+        Row: {
+          draws: number
+          id: string
+          kind: string
+          losses: number
+          manual_rank: number | null
+          name: string
+          played: number
+          points: number
+          top_player: string | null
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          draws?: number
+          id?: string
+          kind: string
+          losses?: number
+          manual_rank?: number | null
+          name: string
+          played?: number
+          points?: number
+          top_player?: string | null
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          draws?: number
+          id?: string
+          kind?: string
+          losses?: number
+          manual_rank?: number | null
+          name?: string
+          played?: number
+          points?: number
+          top_player?: string | null
+          updated_at?: string
+          wins?: number
         }
         Relationships: []
       }
@@ -946,12 +994,63 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          created_at: string
+          gang_name: string
+          id: string
+          ingame_name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["withdrawal_status"]
+          ticket_ref: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          created_at?: string
+          gang_name: string
+          id?: string
+          ingame_name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          ticket_ref?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          created_at?: string
+          gang_name?: string
+          id?: string
+          ingame_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          ticket_ref?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       can_use_gang_chat: { Args: { _user_id: string }; Returns: boolean }
+      create_withdrawal_request: {
+        Args: {
+          _amount: number
+          _gang: string
+          _ingame: string
+          _ticket?: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -961,6 +1060,10 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_mod_or_admin: { Args: { _user_id: string }; Returns: boolean }
+      review_withdrawal_request: {
+        Args: { _approve: boolean; _id: string; _note?: string }
+        Returns: undefined
+      }
       wipe_all_tokens: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -977,6 +1080,7 @@ export type Database = {
       match_status: "scheduled" | "live" | "ended" | "cancelled"
       ticket_status: "open" | "pending" | "resolved" | "closed"
       token_request_status: "pending" | "approved" | "denied"
+      withdrawal_status: "pending" | "approved" | "declined"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1118,6 +1222,7 @@ export const Constants = {
       match_status: ["scheduled", "live", "ended", "cancelled"],
       ticket_status: ["open", "pending", "resolved", "closed"],
       token_request_status: ["pending", "approved", "denied"],
+      withdrawal_status: ["pending", "approved", "declined"],
     },
   },
 } as const
