@@ -1201,6 +1201,7 @@ function AnalyticsPanel() {
 /* ============================ SETTINGS ============================ */
 function SettingsPanel() {
   const [s, setS] = useState<any>(null);
+  const confirm = useConfirm();
   useEffect(() => { supabase.from("app_settings").select("*").eq("id", 1).maybeSingle().then(({ data }) => setS(data ?? { id: 1 })); }, []);
   if (!s) return null;
   async function save() {
@@ -1208,26 +1209,58 @@ function SettingsPanel() {
     if (error) toast.error(error.message); else { toast.success("Saved"); logAudit("settings_updated", "settings"); }
   }
   async function wipe() {
-    if (!confirm("EMERGENCY: Wipe ALL user tokens to zero? This cannot be undone.")) return;
+    if (!await confirm({ title: "EMERGENCY: Wipe ALL user tokens?", description: "This sets every user's balance to 0 and cannot be undone.", tone: "danger", confirmText: "Wipe everything" })) return;
     const { error } = await supabase.rpc("wipe_all_tokens");
     if (error) toast.error(error.message); else toast.success("All tokens cleared");
+  }
+  async function uploadPopup(f: File) {
+    const path = `popup-${Date.now()}-${f.name}`;
+    const { error } = await supabase.storage.from("ads").upload(path, f, { upsert: true });
+    if (error) { toast.error(error.message); return; }
+    const url = supabase.storage.from("ads").getPublicUrl(path).data.publicUrl;
+    setS({ ...s, popup_ad_image: url });
   }
   return (
     <Card className="glass-strong p-4 space-y-3 max-w-2xl">
       <div className="flex items-center justify-between">
-        <div>
-          <div className="font-bold">Maintenance mode</div>
-          <div className="text-xs text-muted-foreground">Blocks all non-admin pages.</div>
-        </div>
+        <div><div className="font-bold">Maintenance mode</div><div className="text-xs text-muted-foreground">Blocks all non-admin pages.</div></div>
         <Switch checked={!!s.maintenance_mode} onCheckedChange={(v) => setS({ ...s, maintenance_mode: v })} />
       </div>
       <Textarea placeholder="Maintenance message" value={s.maintenance_message ?? ""} onChange={(e) => setS({ ...s, maintenance_message: e.target.value })} />
+      <div>
+        <label className="text-xs text-muted-foreground">Hero tagline (top of home page)</label>
+        <Input placeholder="Season 4 · Live" value={s.hero_tagline ?? ""} onChange={(e) => setS({ ...s, hero_tagline: e.target.value })} />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Minimum bet stake</label>
+        <Input type="number" placeholder="2000000" value={s.min_stake ?? 2000000} onChange={(e) => setS({ ...s, min_stake: Number(e.target.value) })} />
+      </div>
       <Input placeholder="Contact email" value={s.contact_email ?? ""} onChange={(e) => setS({ ...s, contact_email: e.target.value })} />
       <Input placeholder="Contact phone" value={s.contact_phone ?? ""} onChange={(e) => setS({ ...s, contact_phone: e.target.value })} />
       <Input placeholder="Contact WhatsApp" value={s.contact_whatsapp ?? ""} onChange={(e) => setS({ ...s, contact_whatsapp: e.target.value })} />
       <Textarea placeholder="About us" rows={3} value={s.about_us ?? ""} onChange={(e) => setS({ ...s, about_us: e.target.value })} />
       <Textarea placeholder="Why trust us" rows={3} value={s.why_trust_us ?? ""} onChange={(e) => setS({ ...s, why_trust_us: e.target.value })} />
       <Textarea placeholder="Terms & Conditions" rows={5} value={s.terms_content ?? ""} onChange={(e) => setS({ ...s, terms_content: e.target.value })} />
+
+      <div className="border-t border-border pt-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="font-bold">Pop-up Ad</div>
+          <Switch checked={!!s.popup_ad_active} onCheckedChange={(v) => setS({ ...s, popup_ad_active: v })} />
+        </div>
+        <Select value={s.popup_ad_size ?? "large"} onValueChange={(v) => setS({ ...s, popup_ad_size: v })}>
+          <SelectTrigger><SelectValue placeholder="Size" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="large">Large</SelectItem>
+            <SelectItem value="xl">Extra Large</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && uploadPopup(e.target.files[0])} />
+        {s.popup_ad_image && <img src={s.popup_ad_image} alt="" className="w-full max-h-48 object-contain rounded border border-border" />}
+        <Textarea placeholder="Popup text/HTML" rows={3} value={s.popup_ad_text ?? ""} onChange={(e) => setS({ ...s, popup_ad_text: e.target.value })} />
+        <Input placeholder="Popup link (optional)" value={s.popup_ad_link ?? ""} onChange={(e) => setS({ ...s, popup_ad_link: e.target.value })} />
+      </div>
+
       <div className="flex gap-2 flex-wrap">
         <Button className="btn-luxury" onClick={save}>Save settings</Button>
         <Button variant="destructive" onClick={wipe}><AlertTriangle className="h-4 w-4 mr-1" />Emergency: wipe all tokens</Button>
