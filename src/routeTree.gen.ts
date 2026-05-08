@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WithdrawRouteImport } from './routes/withdraw'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
@@ -28,6 +29,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TicketIdRouteImport } from './routes/ticket.$id'
 import { Route as MatchesMatchIdRouteImport } from './routes/matches.$matchId'
 
+const WithdrawRoute = WithdrawRouteImport.update({
+  id: '/withdraw',
+  path: '/withdraw',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/support': typeof SupportRoute
+  '/withdraw': typeof WithdrawRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/ticket/$id': typeof TicketIdRoute
 }
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/support': typeof SupportRoute
+  '/withdraw': typeof WithdrawRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/ticket/$id': typeof TicketIdRoute
 }
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/support': typeof SupportRoute
+  '/withdraw': typeof WithdrawRoute
   '/matches/$matchId': typeof MatchesMatchIdRoute
   '/ticket/$id': typeof TicketIdRoute
 }
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/support'
+    | '/withdraw'
     | '/matches/$matchId'
     | '/ticket/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/support'
+    | '/withdraw'
     | '/matches/$matchId'
     | '/ticket/$id'
   id:
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/support'
+    | '/withdraw'
     | '/matches/$matchId'
     | '/ticket/$id'
   fileRoutesById: FileRoutesById
@@ -260,11 +272,19 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SupportRoute: typeof SupportRoute
+  WithdrawRoute: typeof WithdrawRoute
   TicketIdRoute: typeof TicketIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/withdraw': {
+      id: '/withdraw'
+      path: '/withdraw'
+      fullPath: '/withdraw'
+      preLoaderRoute: typeof WithdrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -422,6 +442,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SupportRoute: SupportRoute,
+  WithdrawRoute: WithdrawRoute,
   TicketIdRoute: TicketIdRoute,
 }
 export const routeTree = rootRouteImport

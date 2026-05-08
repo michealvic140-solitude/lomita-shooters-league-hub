@@ -52,7 +52,7 @@ function Page() {
     if (amount > (profile.token_balance ?? 0)) { toast.error("Amount exceeds balance"); return; }
     setBusy(true);
     const { error } = await supabase.rpc("create_withdrawal_request", {
-      _amount: amount, _ingame: ingame.trim(), _gang: gang.trim(), _ticket: ticketRef.trim() || null,
+      _amount: amount, _ingame: ingame.trim(), _gang: gang.trim(), _ticket: ticketRef.trim() || undefined,
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
