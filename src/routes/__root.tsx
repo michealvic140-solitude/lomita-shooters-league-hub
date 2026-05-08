@@ -134,6 +134,7 @@ function RootComponent() {
             </MaintenanceGate>
             <BanGate />
             <PopupAd />
+            <BetSlipFab />
             <Toaster />
           </ConfirmProvider>
         </BetSlipProvider>
