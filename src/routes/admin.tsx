@@ -936,16 +936,22 @@ function CategoriesPanel() {
 /* ============================ TICKETS ============================ */
 function TicketsPanel() {
   const [tickets, setTickets] = useState<any[]>([]);
+  const confirm = useConfirm();
+  async function load() {
+    const { data } = await supabase.from("support_tickets").select("*, profiles:user_id(full_name,email)").order("created_at", { ascending: false }).limit(200);
+    setTickets(data ?? []);
+  }
   useEffect(() => {
-    supabase.from("support_tickets").select("*, profiles:user_id(full_name,email)").order("created_at", { ascending: false }).limit(100)
-      .then(({ data }) => setTickets(data ?? []));
+    load();
+    const ch = supabase.channel("admin-tk").on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, load).subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
   async function setStatus(id: string, status: string) {
     await supabase.from("support_tickets").update({ status: status as any }).eq("id", id);
     setTickets((t) => t.map((x) => x.id === id ? { ...x, status } : x));
   }
   async function del(id: string) {
-    if (!confirm("Delete ticket?")) return;
+    if (!await confirm({ title: "Delete ticket?", tone: "danger", confirmText: "Delete" })) return;
     await supabase.from("support_tickets").delete().eq("id", id);
     setTickets((t) => t.filter((x) => x.id !== id));
   }
