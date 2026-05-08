@@ -48,6 +48,8 @@ function AdminPage() {
             <TabsTrigger value="matches"><Trophy className="h-3 w-3 mr-1" />Matches</TabsTrigger>
             <TabsTrigger value="events"><Calendar className="h-3 w-3 mr-1" />Events</TabsTrigger>
             <TabsTrigger value="tokens"><Coins className="h-3 w-3 mr-1" />Tokens</TabsTrigger>
+            <TabsTrigger value="withdrawals"><Wallet className="h-3 w-3 mr-1" />Withdrawals</TabsTrigger>
+            <TabsTrigger value="leaderboard"><ListOrdered className="h-3 w-3 mr-1" />Leaderboard</TabsTrigger>
             <TabsTrigger value="promos"><Tag className="h-3 w-3 mr-1" />Promo Codes</TabsTrigger>
             <TabsTrigger value="content"><Megaphone className="h-3 w-3 mr-1" />Content</TabsTrigger>
             <TabsTrigger value="tickets"><Ticket className="h-3 w-3 mr-1" />Tickets</TabsTrigger>
@@ -61,6 +63,8 @@ function AdminPage() {
           <TabsContent value="matches" className="mt-4"><MatchesPanel /></TabsContent>
           <TabsContent value="events" className="mt-4"><EventsPanel /></TabsContent>
           <TabsContent value="tokens" className="mt-4"><TokensPanel /></TabsContent>
+          <TabsContent value="withdrawals" className="mt-4"><WithdrawalsPanel /></TabsContent>
+          <TabsContent value="leaderboard" className="mt-4"><LeaderboardAdminPanel /></TabsContent>
           <TabsContent value="promos" className="mt-4"><PromoPanel /></TabsContent>
           <TabsContent value="content" className="mt-4"><ContentPanel /></TabsContent>
           <TabsContent value="tickets" className="mt-4"><TicketsPanel /></TabsContent>
