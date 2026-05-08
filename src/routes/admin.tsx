@@ -341,6 +341,7 @@ function UserEditDialog({ user, roles, onClose }: { user: any; roles: string[]; 
 
 /* ============================ MATCH WIZARD ============================ */
 function MatchesPanel() {
+  const confirm = useConfirm();
   const [matches, setMatches] = useState<any[]>([]);
   const [wizard, setWizard] = useState(false);
 
