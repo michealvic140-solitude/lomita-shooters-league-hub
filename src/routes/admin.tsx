@@ -370,7 +370,7 @@ function MatchesPanel() {
     toast.success("Match settled — bets paid out"); load();
   }
   async function deleteMatch(id: string) {
-    if (!confirm("Delete this match? Cannot be undone.")) return;
+    if (!await confirm({ title: "Delete this match?", description: "This cannot be undone.", tone: "danger", confirmText: "Delete" })) return;
     const { error } = await supabase.from("matches").delete().eq("id", id);
     if (error) toast.error(error.message); else { logAudit("match_deleted", "match", id); load(); }
   }
