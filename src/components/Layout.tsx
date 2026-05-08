@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Crosshair, LogOut, User as UserIcon, Shield, MessageSquare, Home, Trophy, Ticket, LifeBuoy } from "lucide-react";
+import { Crosshair, LogOut, User as UserIcon, Shield, MessageSquare, Home, Trophy, Ticket, LifeBuoy, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth, ROLE_COLORS, ROLE_LABELS } from "@/contexts/AuthContext";
