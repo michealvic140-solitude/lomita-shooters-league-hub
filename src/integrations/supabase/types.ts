@@ -1074,11 +1074,19 @@ export type Database = {
         | "registered"
         | "moderator"
         | "admin"
-      bet_status: "open" | "won" | "lost" | "cashed_out" | "void"
+        | "sponsor"
+      bet_status:
+        | "open"
+        | "won"
+        | "lost"
+        | "cashed_out"
+        | "void"
+        | "suspended"
+        | "refunded"
       chat_room: "general" | "gang" | "moderator"
       gang_type: "G" | "F"
       match_status: "scheduled" | "live" | "ended" | "cancelled"
-      ticket_status: "open" | "pending" | "resolved" | "closed"
+      ticket_status: "open" | "in_progress" | "pending" | "resolved" | "closed"
       token_request_status: "pending" | "approved" | "denied"
       withdrawal_status: "pending" | "approved" | "declined"
     }
@@ -1215,12 +1223,21 @@ export const Constants = {
         "registered",
         "moderator",
         "admin",
+        "sponsor",
       ],
-      bet_status: ["open", "won", "lost", "cashed_out", "void"],
+      bet_status: [
+        "open",
+        "won",
+        "lost",
+        "cashed_out",
+        "void",
+        "suspended",
+        "refunded",
+      ],
       chat_room: ["general", "gang", "moderator"],
       gang_type: ["G", "F"],
       match_status: ["scheduled", "live", "ended", "cancelled"],
-      ticket_status: ["open", "pending", "resolved", "closed"],
+      ticket_status: ["open", "in_progress", "pending", "resolved", "closed"],
       token_request_status: ["pending", "approved", "denied"],
       withdrawal_status: ["pending", "approved", "declined"],
     },
