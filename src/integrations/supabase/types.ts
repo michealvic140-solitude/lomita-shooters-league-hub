@@ -78,6 +78,7 @@ export type Database = {
           id: number
           maintenance_message: string | null
           maintenance_mode: boolean
+          max_payout: number
           min_stake: number
           popup_ad_active: boolean
           popup_ad_image: string | null
@@ -97,6 +98,7 @@ export type Database = {
           id?: number
           maintenance_message?: string | null
           maintenance_mode?: boolean
+          max_payout?: number
           min_stake?: number
           popup_ad_active?: boolean
           popup_ad_image?: string | null
@@ -116,6 +118,7 @@ export type Database = {
           id?: number
           maintenance_message?: string | null
           maintenance_mode?: boolean
+          max_payout?: number
           min_stake?: number
           popup_ad_active?: boolean
           popup_ad_image?: string | null
@@ -676,12 +679,14 @@ export type Database = {
           ban_reason: string | null
           country: string | null
           created_at: string
+          discord_full_name: string | null
           discord_username: string | null
           email: string
           full_name: string
           gang_name: string | null
           gang_type: Database["public"]["Enums"]["gang_type"] | null
           id: string
+          ingame_name: string | null
           is_banned: boolean
           is_muted: boolean
           is_restricted: boolean
@@ -698,12 +703,14 @@ export type Database = {
           ban_reason?: string | null
           country?: string | null
           created_at?: string
+          discord_full_name?: string | null
           discord_username?: string | null
           email: string
           full_name: string
           gang_name?: string | null
           gang_type?: Database["public"]["Enums"]["gang_type"] | null
           id: string
+          ingame_name?: string | null
           is_banned?: boolean
           is_muted?: boolean
           is_restricted?: boolean
@@ -720,12 +727,14 @@ export type Database = {
           ban_reason?: string | null
           country?: string | null
           created_at?: string
+          discord_full_name?: string | null
           discord_username?: string | null
           email?: string
           full_name?: string
           gang_name?: string | null
           gang_type?: Database["public"]["Enums"]["gang_type"] | null
           id?: string
+          ingame_name?: string | null
           is_banned?: boolean
           is_muted?: boolean
           is_restricted?: boolean
@@ -735,6 +744,51 @@ export type Database = {
           server?: string | null
           token_balance?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      promo_code_requests: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          created_at: string
+          generated_code: string | null
+          id: string
+          promo_id: string | null
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          usage_limit: number
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          created_at?: string
+          generated_code?: string | null
+          id?: string
+          promo_id?: string | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          usage_limit?: number
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          created_at?: string
+          generated_code?: string | null
+          id?: string
+          promo_id?: string | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          usage_limit?: number
+          user_id?: string
         }
         Relationships: []
       }
@@ -797,6 +851,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "promo_redemptions_promo_id_fkey"
+            columns: ["promo_id"]
+            isOneToOne: false
+            referencedRelation: "promo_code_usage_log"
+            referencedColumns: ["promo_id"]
+          },
           {
             foreignKeyName: "promo_redemptions_promo_id_fkey"
             columns: ["promo_id"]
@@ -970,6 +1031,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_achievements: {
+        Row: {
+          awarded_at: string
+          code: string
+          description: string | null
+          icon: string | null
+          id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          awarded_at?: string
+          code: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          awarded_at?: string
+          code?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_by: string | null
@@ -990,6 +1081,39 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          reward_tokens: number
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          reward_tokens?: number
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          reward_tokens?: number
+          status?: string
+          title?: string
           user_id?: string
         }
         Relationships: []
@@ -1038,9 +1162,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      promo_code_usage_log: {
+        Row: {
+          amount: number | null
+          code: string | null
+          created_by: string | null
+          generated_at: string | null
+          generated_by_email: string | null
+          generated_by_name: string | null
+          is_active: boolean | null
+          promo_id: string | null
+          redemption_id: string | null
+          usage_limit: number | null
+          used_at: string | null
+          used_by: string | null
+          used_by_email: string | null
+          used_by_name: string | null
+          used_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      admin_delete_bet: {
+        Args: { _bet_id: string; _reason?: string; _refund?: boolean }
+        Returns: undefined
+      }
+      admin_refund_bet: {
+        Args: { _bet_id: string; _reason?: string }
+        Returns: undefined
+      }
+      admin_suspend_bet: {
+        Args: { _bet_id: string; _reason?: string }
+        Returns: undefined
+      }
+      admin_unsuspend_bet: { Args: { _bet_id: string }; Returns: undefined }
+      approve_promo_request: {
+        Args: { _id: string; _note?: string }
+        Returns: string
+      }
       can_use_gang_chat: { Args: { _user_id: string }; Returns: boolean }
       create_withdrawal_request: {
         Args: {
@@ -1050,6 +1210,10 @@ export type Database = {
           _ticket?: string
         }
         Returns: string
+      }
+      decline_promo_request: {
+        Args: { _id: string; _note?: string }
+        Returns: undefined
       }
       has_role: {
         Args: {
@@ -1074,11 +1238,19 @@ export type Database = {
         | "registered"
         | "moderator"
         | "admin"
-      bet_status: "open" | "won" | "lost" | "cashed_out" | "void"
+        | "sponsor"
+      bet_status:
+        | "open"
+        | "won"
+        | "lost"
+        | "cashed_out"
+        | "void"
+        | "suspended"
+        | "refunded"
       chat_room: "general" | "gang" | "moderator"
       gang_type: "G" | "F"
       match_status: "scheduled" | "live" | "ended" | "cancelled"
-      ticket_status: "open" | "pending" | "resolved" | "closed"
+      ticket_status: "open" | "in_progress" | "pending" | "resolved" | "closed"
       token_request_status: "pending" | "approved" | "denied"
       withdrawal_status: "pending" | "approved" | "declined"
     }
@@ -1215,12 +1387,21 @@ export const Constants = {
         "registered",
         "moderator",
         "admin",
+        "sponsor",
       ],
-      bet_status: ["open", "won", "lost", "cashed_out", "void"],
+      bet_status: [
+        "open",
+        "won",
+        "lost",
+        "cashed_out",
+        "void",
+        "suspended",
+        "refunded",
+      ],
       chat_room: ["general", "gang", "moderator"],
       gang_type: ["G", "F"],
       match_status: ["scheduled", "live", "ended", "cancelled"],
-      ticket_status: ["open", "pending", "resolved", "closed"],
+      ticket_status: ["open", "in_progress", "pending", "resolved", "closed"],
       token_request_status: ["pending", "approved", "denied"],
       withdrawal_status: ["pending", "approved", "declined"],
     },
