@@ -482,6 +482,8 @@ function MatchesPanel() {
     load();
   }
 
+  const [oddsOpen, setOddsOpen] = useState<Record<string, boolean>>({});
+
   return (
     <div className="space-y-4">
       <Button className="btn-luxury" onClick={() => setWizard(true)}><Plus className="h-4 w-4 mr-1" />New Match (Wizard)</Button>
@@ -489,27 +491,121 @@ function MatchesPanel() {
 
       <div className="space-y-2">
         {matches.map((m: any) => (
-          <Card key={m.id} className="glass p-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="min-w-0 flex items-center gap-2">
-              {m.home_team?.logo_url && <img src={m.home_team.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />}
-              <div>
-                <div className="font-bold truncate">{m.home_team?.name} vs {m.away_team?.name} {m.status === "ended" && <span className="text-xs text-muted-foreground">({m.home_score}–{m.away_score})</span>}</div>
-                <div className="text-xs text-muted-foreground">{m.name} · {m.start_time ? new Date(m.start_time).toLocaleString() : ""}</div>
+          <Card key={m.id} className="glass p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0 flex items-center gap-2">
+                {m.home_team?.logo_url && <img src={m.home_team.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />}
+                <div>
+                  <div className="font-bold truncate">{m.home_team?.name} vs {m.away_team?.name} {(m.status === "live" || m.status === "ended") && <span className="text-xs text-muted-foreground">({m.home_score}–{m.away_score})</span>}</div>
+                  <div className="text-xs text-muted-foreground">{m.name} · {m.start_time ? new Date(m.start_time).toLocaleString() : ""}</div>
+                </div>
+              </div>
+              <div className="flex gap-1 items-center flex-wrap">
+                <Badge variant="outline" className="capitalize">{m.status}</Badge>
+                {m.status === "live" && (
+                  <LiveScoreEditor m={m} onSave={(hs, as) => updateLiveScore(m, hs, as)} />
+                )}
+                {m.status === "scheduled" && <Button size="sm" onClick={() => setStatus(m.id, "live")}>Start Live</Button>}
+                {m.status === "live" && <Button size="sm" onClick={() => settle(m)}>End Match</Button>}
+                {m.status !== "cancelled" && m.status !== "ended" && <Button size="sm" variant="outline" onClick={() => setStatus(m.id, "cancelled")}>Cancel</Button>}
+                <Button size="sm" variant="outline" onClick={() => setOddsOpen((s) => ({ ...s, [m.id]: !s[m.id] }))}><Pencil className="h-3 w-3 mr-1" />Odds</Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteMatch(m.id)} title="Delete match"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
-            <div className="flex gap-1 items-center flex-wrap">
-              <Badge variant="outline" className="capitalize">{m.status}</Badge>
-              {m.status === "live" && (
-                <LiveScoreEditor m={m} onSave={(hs, as) => updateLiveScore(m, hs, as)} />
-              )}
-              {m.status === "scheduled" && <Button size="sm" onClick={() => setStatus(m.id, "live")}>Start Live</Button>}
-              {m.status === "live" && <Button size="sm" onClick={() => settle(m)}>End Match</Button>}
-              {m.status !== "cancelled" && m.status !== "ended" && <Button size="sm" variant="outline" onClick={() => setStatus(m.id, "cancelled")}>Cancel</Button>}
-              <Button size="sm" variant="destructive" onClick={() => deleteMatch(m.id)} title="Delete match"><Trash2 className="h-3 w-3" /></Button>
-            </div>
+            {oddsOpen[m.id] && <OddsEditor matchId={m.id} />}
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function OddsEditor({ matchId }: { matchId: string }) {
+  const [markets, setMarkets] = useState<any[]>([]);
+  const [odds, setOdds] = useState<Record<string, any[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [newMarket, setNewMarket] = useState("");
+  const confirm = useConfirm();
+
+  async function load() {
+    setLoading(true);
+    const { data: m } = await supabase.from("markets").select("*").eq("match_id", matchId).order("created_at");
+    setMarkets(m ?? []);
+    if (m && m.length) {
+      const { data: o } = await supabase.from("odds").select("*").in("market_id", m.map((x: any) => x.id));
+      const map: Record<string, any[]> = {};
+      (o ?? []).forEach((x: any) => { (map[x.market_id] ??= []).push(x); });
+      setOdds(map);
+    } else setOdds({});
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, [matchId]);
+
+  async function saveOdd(o: any, value: number, label: string) {
+    await supabase.from("odds").update({ value, label, updated_at: new Date().toISOString() }).eq("id", o.id);
+    await logAudit("odds_updated", "odd", o.id, { value, label });
+    toast.success("Odds updated (existing tickets keep locked odds)");
+    load();
+  }
+  async function addOdd(market_id: string) {
+    const { data } = await supabase.from("odds").insert({ market_id, label: "New", value: 2.0 }).select().single();
+    if (data) load();
+  }
+  async function delOdd(o: any) {
+    if (!await confirm({ title: "Remove this selection?", tone: "danger", confirmText: "Remove" })) return;
+    await supabase.from("odds").delete().eq("id", o.id); load();
+  }
+  async function toggleMarket(mk: any) {
+    await supabase.from("markets").update({ is_open: !mk.is_open }).eq("id", mk.id); load();
+  }
+  async function addMarket() {
+    if (!newMarket.trim()) return;
+    await supabase.from("markets").insert({ match_id: matchId, name: newMarket.trim() });
+    setNewMarket(""); load();
+  }
+  async function delMarket(mk: any) {
+    if (!await confirm({ title: `Delete market "${mk.name}"?`, description: "All its selections will be removed.", tone: "danger", confirmText: "Delete" })) return;
+    await supabase.from("odds").delete().eq("market_id", mk.id);
+    await supabase.from("markets").delete().eq("id", mk.id);
+    load();
+  }
+
+  if (loading) return <div className="text-xs text-muted-foreground">Loading markets…</div>;
+  return (
+    <div className="rounded-lg border border-primary/20 bg-background/40 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Input placeholder="Add new market (e.g. First Half Winner)" value={newMarket} onChange={(e) => setNewMarket(e.target.value)} className="h-8" />
+        <Button size="sm" onClick={addMarket}><Plus className="h-3 w-3" /></Button>
+      </div>
+      {markets.length === 0 && <div className="text-xs text-muted-foreground">No markets yet.</div>}
+      {markets.map((mk) => (
+        <div key={mk.id} className="rounded-md bg-background/60 p-2 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <div className="font-bold text-sm flex-1">{mk.name}</div>
+            <Switch checked={mk.is_open} onCheckedChange={() => toggleMarket(mk)} />
+            <span className="text-[10px] text-muted-foreground">{mk.is_open ? "Open" : "Closed"}</span>
+            <Button size="sm" variant="outline" onClick={() => addOdd(mk.id)}><Plus className="h-3 w-3" /></Button>
+            <Button size="sm" variant="destructive" onClick={() => delMarket(mk)}><Trash2 className="h-3 w-3" /></Button>
+          </div>
+          {(odds[mk.id] ?? []).map((o) => (
+            <OddRow key={o.id} o={o} onSave={saveOdd} onDelete={delOdd} />
+          ))}
+        </div>
+      ))}
+      <div className="text-[10px] text-muted-foreground">Editable any time, including LIVE. Existing booked tickets keep their locked-in odds.</div>
+    </div>
+  );
+}
+
+function OddRow({ o, onSave, onDelete }: { o: any; onSave: (o: any, v: number, l: string) => void; onDelete: (o: any) => void }) {
+  const [label, setLabel] = useState<string>(o.label);
+  const [value, setValue] = useState<number>(Number(o.value));
+  return (
+    <div className="flex items-center gap-2">
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} className="h-8 flex-1" />
+      <Input type="number" step="0.01" value={value} onChange={(e) => setValue(Number(e.target.value))} className="h-8 w-24" />
+      <Button size="sm" onClick={() => onSave(o, value, label)}><Check className="h-3 w-3" /></Button>
+      <Button size="sm" variant="destructive" onClick={() => onDelete(o)}><Trash2 className="h-3 w-3" /></Button>
     </div>
   );
 }
