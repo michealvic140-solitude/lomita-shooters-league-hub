@@ -1799,22 +1799,27 @@ function BetTrackerPanel() {
 
   return (
     <div className="space-y-3">
-      <Card className="glass p-3 flex flex-wrap items-center gap-2">
-        <ClipboardList className="h-4 w-4 text-primary" />
-        <div className="font-bold text-sm">Bet Ticket Tracker</div>
-        <div className="flex-1" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tracking, code, user…" className="max-w-xs" />
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {["all","open","won","lost","suspended","refunded","cashed_out","void"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <Card className="relative overflow-hidden glass-strong p-4 border-primary/30 shadow-luxury">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-gold" />
+        <div className="flex items-center gap-2 mb-2">
+          <ClipboardList className="h-4 w-4 text-primary" />
+          <div className="font-bold text-sm">Bet Ticket Tracker</div>
+        </div>
+        <div className="text-[11px] text-muted-foreground mb-2">Paste a tracking ID, booking code, user name or email to jump to a ticket. Suspend, refund, void a single match, or delete with reason — actions update users in real time.</div>
+        <div className="flex flex-wrap gap-2">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Paste LSL-XXXXXXXXXX, booking code, or search user…" className="flex-1 min-w-[220px] h-10 font-mono" />
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-36 h-10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["all","open","won","lost","suspended","refunded","cashed_out","void"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </Card>
       <div className="space-y-2">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">No tickets match.</p>}
         {filtered.map((b) => (
-          <Card key={b.id} className="glass p-3">
+          <Card key={b.id} className="glass p-3 space-y-2">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1824,6 +1829,7 @@ function BetTrackerPanel() {
                     b.status === 'won' ? 'border-emerald-500/50 text-emerald-300' :
                     b.status === 'lost' ? 'border-destructive/50 text-destructive' :
                     b.status === 'suspended' ? 'border-amber-500/50 text-amber-300' :
+                    b.status === 'void' ? 'border-muted-foreground/50 text-muted-foreground' :
                     'border-primary/50 text-primary'
                   }>{b.status}</Badge>
                 </div>
@@ -1834,17 +1840,26 @@ function BetTrackerPanel() {
                 <div className="text-xs text-muted-foreground mt-0.5">
                   Stake {Number(b.stake).toLocaleString()} · Odds {Number(b.total_odds).toFixed(2)} · Payout {Number(b.potential_payout).toLocaleString()} · {new Date(b.created_at).toLocaleString()}
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-1 truncate">
-                  {(b.bet_selections ?? []).map((s: any) => `${s.matches?.name ?? "Match"}: ${s.selection_label} @${Number(s.locked_odds).toFixed(2)}`).join(" · ")}
-                </div>
               </div>
               <div className="flex gap-1 items-center">
                 <Button asChild size="sm" variant="outline"><a href={`/ticket/${b.id}`}>View</a></Button>
-                {b.status === "open" && <Button size="sm" variant="outline" onClick={() => suspend(b)}><Pause className="h-3 w-3" /></Button>}
-                {b.status === "suspended" && <Button size="sm" variant="outline" onClick={() => unsuspend(b)}><Play className="h-3 w-3" /></Button>}
-                {!["won", "cashed_out", "refunded"].includes(b.status) && <Button size="sm" variant="outline" onClick={() => refund(b)}><RotateCw className="h-3 w-3" /></Button>}
-                <Button size="sm" variant="destructive" onClick={() => del(b)}><Trash2 className="h-3 w-3" /></Button>
+                {b.status === "open" && <Button size="sm" variant="outline" onClick={() => suspend(b)} title="Suspend / flag"><Pause className="h-3 w-3" /></Button>}
+                {b.status === "suspended" && <Button size="sm" variant="outline" onClick={() => unsuspend(b)} title="Unsuspend"><Play className="h-3 w-3" /></Button>}
+                {!["won", "cashed_out", "refunded"].includes(b.status) && <Button size="sm" variant="outline" onClick={() => refund(b)} title="Refund stake"><RotateCw className="h-3 w-3" /></Button>}
+                <Button size="sm" variant="destructive" onClick={() => del(b)} title="Delete ticket"><Trash2 className="h-3 w-3" /></Button>
               </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/40 divide-y divide-border/50">
+              {(b.bet_selections ?? []).map((s: any) => (
+                <div key={s.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[11px]">
+                  <span className="flex-1 truncate"><span className="font-bold">{s.matches?.name ?? "Match"}</span> <span className="text-muted-foreground">· {s.selection_label}</span></span>
+                  <span className="font-mono text-amber-300">@{Number(s.locked_odds).toFixed(2)}</span>
+                  <Badge variant="outline" className={`text-[9px] capitalize ${s.result === 'won' ? 'border-emerald-500/50 text-emerald-300' : s.result === 'lost' ? 'border-destructive/50 text-destructive' : s.result === 'void' ? 'border-muted-foreground/50 text-muted-foreground' : 'border-primary/30 text-primary'}`}>{s.result ?? "pending"}</Badge>
+                  {s.result !== 'void' && !['won','lost','cashed_out','refunded'].includes(b.status) && (
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => voidSel(s)}>Void</Button>
+                  )}
+                </div>
+              ))}
             </div>
           </Card>
         ))}
