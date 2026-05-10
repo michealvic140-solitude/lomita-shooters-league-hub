@@ -1197,6 +1197,10 @@ export type Database = {
         Returns: undefined
       }
       admin_unsuspend_bet: { Args: { _bet_id: string }; Returns: undefined }
+      admin_void_bet_selection: {
+        Args: { _reason?: string; _selection_id: string }
+        Returns: undefined
+      }
       approve_promo_request: {
         Args: { _id: string; _note?: string }
         Returns: string
