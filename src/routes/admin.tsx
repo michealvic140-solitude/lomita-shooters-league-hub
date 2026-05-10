@@ -1784,6 +1784,12 @@ function BetTrackerPanel() {
     const { error } = await supabase.rpc("admin_refund_bet", { _bet_id: b.id, _reason: ok.value || undefined });
     if (error) toast.error(error.message); else { toast.success("Ticket refunded"); load(); }
   }
+  async function voidSel(s: any) {
+    const ok = await confirm({ title: `Void this match on the ticket?`, description: `${s.matches?.name ?? "Match"} · ${s.selection_label}. Odds become 1.00 on this leg and the ticket's payout will be recalculated.`, tone: "danger", confirmText: "Void match", inputLabel: "Reason", inputPlaceholder: "Why is this match being voided…" });
+    if (!ok || typeof ok !== "object") return;
+    const { error } = await supabase.rpc("admin_void_bet_selection", { _selection_id: s.id, _reason: ok.value || undefined });
+    if (error) toast.error(error.message); else { toast.success("Match voided on ticket"); load(); }
+  }
 
   const filtered = bets.filter((b) => {
     if (!q) return true;
