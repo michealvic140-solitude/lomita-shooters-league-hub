@@ -482,6 +482,8 @@ function MatchesPanel() {
     load();
   }
 
+  const [oddsOpen, setOddsOpen] = useState<Record<string, boolean>>({});
+
   return (
     <div className="space-y-4">
       <Button className="btn-luxury" onClick={() => setWizard(true)}><Plus className="h-4 w-4 mr-1" />New Match (Wizard)</Button>
@@ -489,27 +491,121 @@ function MatchesPanel() {
 
       <div className="space-y-2">
         {matches.map((m: any) => (
-          <Card key={m.id} className="glass p-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="min-w-0 flex items-center gap-2">
-              {m.home_team?.logo_url && <img src={m.home_team.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />}
-              <div>
-                <div className="font-bold truncate">{m.home_team?.name} vs {m.away_team?.name} {m.status === "ended" && <span className="text-xs text-muted-foreground">({m.home_score}–{m.away_score})</span>}</div>
-                <div className="text-xs text-muted-foreground">{m.name} · {m.start_time ? new Date(m.start_time).toLocaleString() : ""}</div>
+          <Card key={m.id} className="glass p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0 flex items-center gap-2">
+                {m.home_team?.logo_url && <img src={m.home_team.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />}
+                <div>
+                  <div className="font-bold truncate">{m.home_team?.name} vs {m.away_team?.name} {(m.status === "live" || m.status === "ended") && <span className="text-xs text-muted-foreground">({m.home_score}–{m.away_score})</span>}</div>
+                  <div className="text-xs text-muted-foreground">{m.name} · {m.start_time ? new Date(m.start_time).toLocaleString() : ""}</div>
+                </div>
+              </div>
+              <div className="flex gap-1 items-center flex-wrap">
+                <Badge variant="outline" className="capitalize">{m.status}</Badge>
+                {m.status === "live" && (
+                  <LiveScoreEditor m={m} onSave={(hs, as) => updateLiveScore(m, hs, as)} />
+                )}
+                {m.status === "scheduled" && <Button size="sm" onClick={() => setStatus(m.id, "live")}>Start Live</Button>}
+                {m.status === "live" && <Button size="sm" onClick={() => settle(m)}>End Match</Button>}
+                {m.status !== "cancelled" && m.status !== "ended" && <Button size="sm" variant="outline" onClick={() => setStatus(m.id, "cancelled")}>Cancel</Button>}
+                <Button size="sm" variant="outline" onClick={() => setOddsOpen((s) => ({ ...s, [m.id]: !s[m.id] }))}><Pencil className="h-3 w-3 mr-1" />Odds</Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteMatch(m.id)} title="Delete match"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
-            <div className="flex gap-1 items-center flex-wrap">
-              <Badge variant="outline" className="capitalize">{m.status}</Badge>
-              {m.status === "live" && (
-                <LiveScoreEditor m={m} onSave={(hs, as) => updateLiveScore(m, hs, as)} />
-              )}
-              {m.status === "scheduled" && <Button size="sm" onClick={() => setStatus(m.id, "live")}>Start Live</Button>}
-              {m.status === "live" && <Button size="sm" onClick={() => settle(m)}>End Match</Button>}
-              {m.status !== "cancelled" && m.status !== "ended" && <Button size="sm" variant="outline" onClick={() => setStatus(m.id, "cancelled")}>Cancel</Button>}
-              <Button size="sm" variant="destructive" onClick={() => deleteMatch(m.id)} title="Delete match"><Trash2 className="h-3 w-3" /></Button>
-            </div>
+            {oddsOpen[m.id] && <OddsEditor matchId={m.id} />}
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function OddsEditor({ matchId }: { matchId: string }) {
+  const [markets, setMarkets] = useState<any[]>([]);
+  const [odds, setOdds] = useState<Record<string, any[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [newMarket, setNewMarket] = useState("");
+  const confirm = useConfirm();
+
+  async function load() {
+    setLoading(true);
+    const { data: m } = await supabase.from("markets").select("*").eq("match_id", matchId).order("created_at");
+    setMarkets(m ?? []);
+    if (m && m.length) {
+      const { data: o } = await supabase.from("odds").select("*").in("market_id", m.map((x: any) => x.id));
+      const map: Record<string, any[]> = {};
+      (o ?? []).forEach((x: any) => { (map[x.market_id] ??= []).push(x); });
+      setOdds(map);
+    } else setOdds({});
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, [matchId]);
+
+  async function saveOdd(o: any, value: number, label: string) {
+    await supabase.from("odds").update({ value, label, updated_at: new Date().toISOString() }).eq("id", o.id);
+    await logAudit("odds_updated", "odd", o.id, { value, label });
+    toast.success("Odds updated (existing tickets keep locked odds)");
+    load();
+  }
+  async function addOdd(market_id: string) {
+    const { data } = await supabase.from("odds").insert({ market_id, label: "New", value: 2.0 }).select().single();
+    if (data) load();
+  }
+  async function delOdd(o: any) {
+    if (!await confirm({ title: "Remove this selection?", tone: "danger", confirmText: "Remove" })) return;
+    await supabase.from("odds").delete().eq("id", o.id); load();
+  }
+  async function toggleMarket(mk: any) {
+    await supabase.from("markets").update({ is_open: !mk.is_open }).eq("id", mk.id); load();
+  }
+  async function addMarket() {
+    if (!newMarket.trim()) return;
+    await supabase.from("markets").insert({ match_id: matchId, name: newMarket.trim() });
+    setNewMarket(""); load();
+  }
+  async function delMarket(mk: any) {
+    if (!await confirm({ title: `Delete market "${mk.name}"?`, description: "All its selections will be removed.", tone: "danger", confirmText: "Delete" })) return;
+    await supabase.from("odds").delete().eq("market_id", mk.id);
+    await supabase.from("markets").delete().eq("id", mk.id);
+    load();
+  }
+
+  if (loading) return <div className="text-xs text-muted-foreground">Loading markets…</div>;
+  return (
+    <div className="rounded-lg border border-primary/20 bg-background/40 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Input placeholder="Add new market (e.g. First Half Winner)" value={newMarket} onChange={(e) => setNewMarket(e.target.value)} className="h-8" />
+        <Button size="sm" onClick={addMarket}><Plus className="h-3 w-3" /></Button>
+      </div>
+      {markets.length === 0 && <div className="text-xs text-muted-foreground">No markets yet.</div>}
+      {markets.map((mk) => (
+        <div key={mk.id} className="rounded-md bg-background/60 p-2 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <div className="font-bold text-sm flex-1">{mk.name}</div>
+            <Switch checked={mk.is_open} onCheckedChange={() => toggleMarket(mk)} />
+            <span className="text-[10px] text-muted-foreground">{mk.is_open ? "Open" : "Closed"}</span>
+            <Button size="sm" variant="outline" onClick={() => addOdd(mk.id)}><Plus className="h-3 w-3" /></Button>
+            <Button size="sm" variant="destructive" onClick={() => delMarket(mk)}><Trash2 className="h-3 w-3" /></Button>
+          </div>
+          {(odds[mk.id] ?? []).map((o) => (
+            <OddRow key={o.id} o={o} onSave={saveOdd} onDelete={delOdd} />
+          ))}
+        </div>
+      ))}
+      <div className="text-[10px] text-muted-foreground">Editable any time, including LIVE. Existing booked tickets keep their locked-in odds.</div>
+    </div>
+  );
+}
+
+function OddRow({ o, onSave, onDelete }: { o: any; onSave: (o: any, v: number, l: string) => void; onDelete: (o: any) => void }) {
+  const [label, setLabel] = useState<string>(o.label);
+  const [value, setValue] = useState<number>(Number(o.value));
+  return (
+    <div className="flex items-center gap-2">
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} className="h-8 flex-1" />
+      <Input type="number" step="0.01" value={value} onChange={(e) => setValue(Number(e.target.value))} className="h-8 w-24" />
+      <Button size="sm" onClick={() => onSave(o, value, label)}><Check className="h-3 w-3" /></Button>
+      <Button size="sm" variant="destructive" onClick={() => onDelete(o)}><Trash2 className="h-3 w-3" /></Button>
     </div>
   );
 }
@@ -1688,6 +1784,12 @@ function BetTrackerPanel() {
     const { error } = await supabase.rpc("admin_refund_bet", { _bet_id: b.id, _reason: ok.value || undefined });
     if (error) toast.error(error.message); else { toast.success("Ticket refunded"); load(); }
   }
+  async function voidSel(s: any) {
+    const ok = await confirm({ title: `Void this match on the ticket?`, description: `${s.matches?.name ?? "Match"} · ${s.selection_label}. Odds become 1.00 on this leg and the ticket's payout will be recalculated.`, tone: "danger", confirmText: "Void match", inputLabel: "Reason", inputPlaceholder: "Why is this match being voided…" });
+    if (!ok || typeof ok !== "object") return;
+    const { error } = await supabase.rpc("admin_void_bet_selection", { _selection_id: s.id, _reason: ok.value || undefined });
+    if (error) toast.error(error.message); else { toast.success("Match voided on ticket"); load(); }
+  }
 
   const filtered = bets.filter((b) => {
     if (!q) return true;
@@ -1697,22 +1799,27 @@ function BetTrackerPanel() {
 
   return (
     <div className="space-y-3">
-      <Card className="glass p-3 flex flex-wrap items-center gap-2">
-        <ClipboardList className="h-4 w-4 text-primary" />
-        <div className="font-bold text-sm">Bet Ticket Tracker</div>
-        <div className="flex-1" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tracking, code, user…" className="max-w-xs" />
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {["all","open","won","lost","suspended","refunded","cashed_out","void"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <Card className="relative overflow-hidden glass-strong p-4 border-primary/30 shadow-luxury">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-gold" />
+        <div className="flex items-center gap-2 mb-2">
+          <ClipboardList className="h-4 w-4 text-primary" />
+          <div className="font-bold text-sm">Bet Ticket Tracker</div>
+        </div>
+        <div className="text-[11px] text-muted-foreground mb-2">Paste a tracking ID, booking code, user name or email to jump to a ticket. Suspend, refund, void a single match, or delete with reason — actions update users in real time.</div>
+        <div className="flex flex-wrap gap-2">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Paste LSL-XXXXXXXXXX, booking code, or search user…" className="flex-1 min-w-[220px] h-10 font-mono" />
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-36 h-10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["all","open","won","lost","suspended","refunded","cashed_out","void"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </Card>
       <div className="space-y-2">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">No tickets match.</p>}
         {filtered.map((b) => (
-          <Card key={b.id} className="glass p-3">
+          <Card key={b.id} className="glass p-3 space-y-2">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1722,6 +1829,7 @@ function BetTrackerPanel() {
                     b.status === 'won' ? 'border-emerald-500/50 text-emerald-300' :
                     b.status === 'lost' ? 'border-destructive/50 text-destructive' :
                     b.status === 'suspended' ? 'border-amber-500/50 text-amber-300' :
+                    b.status === 'void' ? 'border-muted-foreground/50 text-muted-foreground' :
                     'border-primary/50 text-primary'
                   }>{b.status}</Badge>
                 </div>
@@ -1732,17 +1840,26 @@ function BetTrackerPanel() {
                 <div className="text-xs text-muted-foreground mt-0.5">
                   Stake {Number(b.stake).toLocaleString()} · Odds {Number(b.total_odds).toFixed(2)} · Payout {Number(b.potential_payout).toLocaleString()} · {new Date(b.created_at).toLocaleString()}
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-1 truncate">
-                  {(b.bet_selections ?? []).map((s: any) => `${s.matches?.name ?? "Match"}: ${s.selection_label} @${Number(s.locked_odds).toFixed(2)}`).join(" · ")}
-                </div>
               </div>
               <div className="flex gap-1 items-center">
                 <Button asChild size="sm" variant="outline"><a href={`/ticket/${b.id}`}>View</a></Button>
-                {b.status === "open" && <Button size="sm" variant="outline" onClick={() => suspend(b)}><Pause className="h-3 w-3" /></Button>}
-                {b.status === "suspended" && <Button size="sm" variant="outline" onClick={() => unsuspend(b)}><Play className="h-3 w-3" /></Button>}
-                {!["won", "cashed_out", "refunded"].includes(b.status) && <Button size="sm" variant="outline" onClick={() => refund(b)}><RotateCw className="h-3 w-3" /></Button>}
-                <Button size="sm" variant="destructive" onClick={() => del(b)}><Trash2 className="h-3 w-3" /></Button>
+                {b.status === "open" && <Button size="sm" variant="outline" onClick={() => suspend(b)} title="Suspend / flag"><Pause className="h-3 w-3" /></Button>}
+                {b.status === "suspended" && <Button size="sm" variant="outline" onClick={() => unsuspend(b)} title="Unsuspend"><Play className="h-3 w-3" /></Button>}
+                {!["won", "cashed_out", "refunded"].includes(b.status) && <Button size="sm" variant="outline" onClick={() => refund(b)} title="Refund stake"><RotateCw className="h-3 w-3" /></Button>}
+                <Button size="sm" variant="destructive" onClick={() => del(b)} title="Delete ticket"><Trash2 className="h-3 w-3" /></Button>
               </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/40 divide-y divide-border/50">
+              {(b.bet_selections ?? []).map((s: any) => (
+                <div key={s.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[11px]">
+                  <span className="flex-1 truncate"><span className="font-bold">{s.matches?.name ?? "Match"}</span> <span className="text-muted-foreground">· {s.selection_label}</span></span>
+                  <span className="font-mono text-amber-300">@{Number(s.locked_odds).toFixed(2)}</span>
+                  <Badge variant="outline" className={`text-[9px] capitalize ${s.result === 'won' ? 'border-emerald-500/50 text-emerald-300' : s.result === 'lost' ? 'border-destructive/50 text-destructive' : s.result === 'void' ? 'border-muted-foreground/50 text-muted-foreground' : 'border-primary/30 text-primary'}`}>{s.result ?? "pending"}</Badge>
+                  {s.result !== 'void' && !['won','lost','cashed_out','refunded'].includes(b.status) && (
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => voidSel(s)}>Void</Button>
+                  )}
+                </div>
+              ))}
             </div>
           </Card>
         ))}
